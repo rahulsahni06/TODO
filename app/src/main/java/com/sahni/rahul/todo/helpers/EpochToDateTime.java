@@ -9,7 +9,7 @@ import java.util.Locale;
  * Created by sahni on 30-Jun-17.
  */
 
-public class EpochToDate {
+public class EpochToDateTime {
 
     /**
      *

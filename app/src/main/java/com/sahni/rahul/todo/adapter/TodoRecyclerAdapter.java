@@ -11,7 +11,7 @@ import android.widget.TextView;
 
 import com.sahni.rahul.todo.R;
 import com.sahni.rahul.todo.database.TodoOpenHelper;
-import com.sahni.rahul.todo.helpers.EpochToDate;
+import com.sahni.rahul.todo.helpers.EpochToDateTime;
 import com.sahni.rahul.todo.interfaces.CheckBoxClickedListener;
 import com.sahni.rahul.todo.interfaces.TodoViewHolderClickListener;
 import com.sahni.rahul.todo.models.TodoClass;
@@ -76,8 +76,8 @@ public class TodoRecyclerAdapter extends RecyclerView.Adapter<TodoRecyclerAdapte
         changeDateTimeColor(date, time, holder);
 
 
-        holder.dateTextView.setText(EpochToDate.convert(todo.getDate()));
-        holder.timeTextView.setText(EpochToDate.convertTime(todo.getTime()));
+        holder.dateTextView.setText(EpochToDateTime.convert(todo.getDate()));
+        holder.timeTextView.setText(EpochToDateTime.convertTime(todo.getTime()));
         holder.categoryTextView.setText(todo.getCategory());
 
         holder.statusCheckBox.setOnClickListener(new View.OnClickListener() {
@@ -103,12 +103,12 @@ public class TodoRecyclerAdapter extends RecyclerView.Adapter<TodoRecyclerAdapte
 
     private void changeDateTimeColor(long date, long time, TodoViewHolder holder){
 
-        if(EpochToDate.convert(date).equalsIgnoreCase("Today") &&  (time > System.currentTimeMillis() || time == EpochToDate.NO_TIME_SELECTED)){
+        if(EpochToDateTime.convert(date).equalsIgnoreCase("Today") &&  (time > System.currentTimeMillis() || time == EpochToDateTime.NO_TIME_SELECTED)){
             holder.dateTextView.setTextColor(ContextCompat.getColor(context, R.color.todoColorPrimary));
             holder.timeTextView.setTextColor(ContextCompat.getColor(context, R.color.todoColorPrimary));
         }
-        else if((time != EpochToDate.NO_TIME_SELECTED && time < System.currentTimeMillis())
-                || (time == EpochToDate.NO_TIME_SELECTED && date < System.currentTimeMillis())){
+        else if((time != EpochToDateTime.NO_TIME_SELECTED && time < System.currentTimeMillis())
+                || (time == EpochToDateTime.NO_TIME_SELECTED && date < System.currentTimeMillis())){
             holder.dateTextView.setTextColor(ContextCompat.getColor(context, android.R.color.holo_red_light));
             holder.timeTextView.setTextColor(ContextCompat.getColor(context, android.R.color.holo_red_light));
         }

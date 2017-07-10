@@ -25,7 +25,7 @@ public class TodoOpenHelper extends SQLiteOpenHelper {
 
 
     /**
-     * Singleton class, its object can only be created inside the class
+     * Singleton class, its object is created only once
      */
 
     static TodoOpenHelper todoOpenHelper;
@@ -53,7 +53,8 @@ public class TodoOpenHelper extends SQLiteOpenHelper {
                       TODO_CATEGORY + " TEXT, "+
                       TODO_DATE + " INTEGER, "+
                       TODO_TIME + " INTEGER, "+
-                      TODO_STATUS + " INTEGER DEFAULT 0);";
+                      TODO_STATUS + " INTEGER DEFAULT 0" +
+                ");";
 
         db.execSQL(query);
 
