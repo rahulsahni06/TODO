@@ -12,6 +12,8 @@ import android.widget.TextView;
 import com.sahni.rahul.todo.R;
 import com.sahni.rahul.todo.database.TodoOpenHelper;
 import com.sahni.rahul.todo.helpers.EpochToDate;
+import com.sahni.rahul.todo.interfaces.CheckBoxClickedListener;
+import com.sahni.rahul.todo.interfaces.TodoViewHolderClickListener;
 import com.sahni.rahul.todo.models.TodoClass;
 
 import java.util.ArrayList;
@@ -26,6 +28,17 @@ public class TodoRecyclerAdapter extends RecyclerView.Adapter<TodoRecyclerAdapte
     ArrayList<TodoClass> arrayList;
     Context context;
 
+    TodoViewHolderClickListener viewHolderClickListener;
+    CheckBoxClickedListener checkBoxClickedListener;
+
+    public void setCheckBoxClickedListener(CheckBoxClickedListener listener){
+        checkBoxClickedListener = listener;
+    }
+
+    public void setViewHolderClickListener(TodoViewHolderClickListener viewHolderClickListener){
+        this.viewHolderClickListener = viewHolderClickListener;
+    }
+
     public TodoRecyclerAdapter(Context context, ArrayList<TodoClass> arrayList) {
         this.context = context;
         this.arrayList = arrayList;
@@ -34,13 +47,13 @@ public class TodoRecyclerAdapter extends RecyclerView.Adapter<TodoRecyclerAdapte
     @Override
     public TodoViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
 
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.list_layout, null);
+        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.list_layout, parent, false);
 
         return new TodoViewHolder(view);
     }
 
     @Override
-    public void onBindViewHolder(TodoViewHolder holder, int position) {
+    public void onBindViewHolder(TodoViewHolder holder, final int position) {
         TodoClass todo = arrayList.get(position);
 
 
@@ -59,6 +72,37 @@ public class TodoRecyclerAdapter extends RecyclerView.Adapter<TodoRecyclerAdapte
         long date = todo.getDate();
         long time = todo.getTime();
 
+
+        changeDateTimeColor(date, time, holder);
+
+
+        holder.dateTextView.setText(EpochToDate.convert(todo.getDate()));
+        holder.timeTextView.setText(EpochToDate.convertTime(todo.getTime()));
+        holder.categoryTextView.setText(todo.getCategory());
+
+        holder.statusCheckBox.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                if(checkBoxClickedListener!=null){
+
+                    CheckBox checkBox = (CheckBox) v;
+                    checkBoxClickedListener.checkBoxClicked(checkBox, position);
+                }
+            }
+        });
+
+
+    }
+
+    @Override
+    public int getItemCount() {
+        return arrayList.size();
+    }
+
+
+    private void changeDateTimeColor(long date, long time, TodoViewHolder holder){
+
         if(EpochToDate.convert(date).equalsIgnoreCase("Today") &&  (time > System.currentTimeMillis() || time == EpochToDate.NO_TIME_SELECTED)){
             holder.dateTextView.setTextColor(ContextCompat.getColor(context, R.color.todoColorPrimary));
             holder.timeTextView.setTextColor(ContextCompat.getColor(context, R.color.todoColorPrimary));
@@ -74,19 +118,11 @@ public class TodoRecyclerAdapter extends RecyclerView.Adapter<TodoRecyclerAdapte
             holder.timeTextView.setTextColor(oldColor);
         }
 
-        holder.dateTextView.setText(EpochToDate.convert(todo.getDate()));
-        holder.timeTextView.setText(EpochToDate.convertTime(todo.getTime()));
-        holder.categoryTextView.setText(todo.getCategory());
 
     }
 
-    @Override
-    public int getItemCount() {
-        return arrayList.size();
-    }
 
-
-    class TodoViewHolder extends RecyclerView.ViewHolder{
+    class TodoViewHolder extends RecyclerView.ViewHolder {
 
         TextView titleTextView;
         TextView dateTextView;
@@ -103,6 +139,29 @@ public class TodoRecyclerAdapter extends RecyclerView.Adapter<TodoRecyclerAdapte
             categoryTextView = (TextView) itemView.findViewById(R.id.category_text_view);
             statusCheckBox = (CheckBox) itemView.findViewById(R.id.status_check_box);
             oldColor = categoryTextView.getCurrentTextColor();
+
+            itemView.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if(viewHolderClickListener != null){
+                        viewHolderClickListener.onTodoViewHolderClicked(v);
+                    }
+                }
+            });
+
+            itemView.setOnLongClickListener(new View.OnLongClickListener() {
+                @Override
+                public boolean onLongClick(View v) {
+                    if(viewHolderClickListener != null){
+                        viewHolderClickListener.onTodoViewHolderLongClicked(v);
+                    }
+                    return true;
+                }
+            });
+
+
         }
+
+
     }
 }
