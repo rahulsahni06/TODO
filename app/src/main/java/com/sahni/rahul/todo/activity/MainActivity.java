@@ -6,32 +6,37 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.database.DatabaseUtils;
 import android.database.sqlite.SQLiteDatabase;
-import android.os.Build;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.DividerItemDecoration;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
-import android.widget.ListView;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
-import com.sahni.rahul.todo.helpers.IntentConstants;
 import com.sahni.rahul.todo.R;
-import com.sahni.rahul.todo.models.TodoClass;
-import com.sahni.rahul.todo.adapter.TodoListArrayAdapter;
+import com.sahni.rahul.todo.adapter.TodoRecyclerAdapter;
 import com.sahni.rahul.todo.database.TodoOpenHelper;
+import com.sahni.rahul.todo.helpers.IntentConstants;
 import com.sahni.rahul.todo.interfaces.CheckBoxClickedListener;
+import com.sahni.rahul.todo.interfaces.TodoViewHolderClickListener;
+import com.sahni.rahul.todo.models.TodoClass;
 
 import java.util.ArrayList;
 
-public class MainActivity extends AppCompatActivity implements CheckBoxClickedListener {
+public class MainActivity extends AppCompatActivity implements TodoViewHolderClickListener, CheckBoxClickedListener {
 
     public static final int ADD_REQ_CODE = 1;
     public static final int EDIT_REQ_CODE = 2;
@@ -39,33 +44,22 @@ public class MainActivity extends AppCompatActivity implements CheckBoxClickedLi
     public static final String TITLE_SHARED_PREF_KEY = "title_key";
     public static final String DATE_SHARED_PREF_KEY = "Date_key";
 
-    ListView todoListView;
+    public static final int SUCCESS = 1;
+    public static final int FAIL = 0;
+
+
+
+
     ArrayList<TodoClass> todoArrayList;
-    TodoListArrayAdapter todoListArrayAdapter;
     TextView noTodoTextView;
     View bottomSheetView;
 
+    RecyclerView todoRecyclerView;
+    TodoRecyclerAdapter todoAdapter;
+
+
     ArrayList<String> spinnerList;
     Spinner spinner;
-
-    boolean isSharedPrefEmpty = true;
-
-    ArrayList<TodoClass> categoryArrayList;
-
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        Log.d("onActivityResult_tag", "in onResume");
-
-
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        Log.d("onActivityResult_tag", "in onPause");
-    }
 
 
     @Override
@@ -75,33 +69,34 @@ public class MainActivity extends AppCompatActivity implements CheckBoxClickedLi
         setContentView(R.layout.activity_main);
 
 
+        Toolbar toolbar = (Toolbar) findViewById(R.id.main_activity_toolbar);
+        setSupportActionBar(toolbar);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            Toolbar toolbar = (Toolbar) findViewById(R.id.main_activity_toolbar);
-            setSupportActionBar(toolbar);
+        ActionBar actionBar = getSupportActionBar();
 
-            ActionBar actionBar = getSupportActionBar();
-            if (actionBar != null) {
-                actionBar.setTitle("Todo");
-
-            }
+        if (actionBar != null) {
+            actionBar.setTitle("Todo");
 
         }
 
-
-
-        todoListView = (ListView) findViewById(R.id.activity_main_list_view);
-        noTodoTextView = (TextView) findViewById(R.id.no_todo_text_view);
         todoArrayList = new ArrayList<>();
-        todoListArrayAdapter = new TodoListArrayAdapter(this, todoArrayList);
-        todoListView.setAdapter(todoListArrayAdapter);
-        todoListView.setTranscriptMode(ListView.TRANSCRIPT_MODE_NORMAL);
-
-
-
 
 
         spinner = (Spinner) findViewById(R.id.main_spinner);
+        noTodoTextView = (TextView) findViewById(R.id.no_todo_text_view);
+        todoRecyclerView = (RecyclerView) findViewById(R.id.activity_main_recycler_view);
+        todoAdapter = new TodoRecyclerAdapter(this, todoArrayList);
+        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.add_fab);
+
+        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
+        todoRecyclerView.setLayoutManager(layoutManager);
+
+        DividerItemDecoration itemDecoration = new DividerItemDecoration(this, DividerItemDecoration.VERTICAL);
+        todoRecyclerView.addItemDecoration(itemDecoration);
+        todoRecyclerView.setAdapter(todoAdapter);
+
+
+
         spinnerList = new ArrayList<>();
         spinnerList.add("All");
         spinnerList.add("General");
@@ -109,6 +104,7 @@ public class MainActivity extends AppCompatActivity implements CheckBoxClickedLi
         spinnerList.add("Home");
         spinnerList.add("Work");
         spinnerList.add("Finished");
+
         final ArrayAdapter spinnerAdapter = new ArrayAdapter<>(this, R.layout.spinner_item, spinnerList);
         spinner.setAdapter(spinnerAdapter);
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -116,7 +112,7 @@ public class MainActivity extends AppCompatActivity implements CheckBoxClickedLi
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
 //                Toast.makeText(MainActivity.this, spinnerList.get(position) + "selected", Toast.LENGTH_SHORT).show();
-                showSelectedCategory(position);
+                showSpinnerSelectedCategory(position);
             }
 
             @Override
@@ -125,75 +121,9 @@ public class MainActivity extends AppCompatActivity implements CheckBoxClickedLi
             }
         });
 
+        todoAdapter.setViewHolderClickListener(this);
+        todoAdapter.setCheckBoxClickedListener(this);
 
-
-
-        todoListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-
-
-
-
-                TodoClass todo = todoArrayList.get(position);
-
-                Intent intent = new Intent(MainActivity.this, AddTodoActivity.class);
-                intent.putExtra(IntentConstants.REQ_KEY, EDIT_REQ_CODE);
-                intent.putExtra(IntentConstants.TODO_TITLE, todo.getTitle());
-                intent.putExtra(IntentConstants.TODO_DATE, todo.getDate());
-                intent.putExtra(IntentConstants.TODO_ID, todo.getId());
-                intent.putExtra(IntentConstants.TODO_STATUS, todo.getStatus());
-
-                startActivityForResult(intent, EDIT_REQ_CODE);
-            }
-        });
-
-        todoListView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
-            @Override
-            public boolean onItemLongClick(AdapterView<?> parent, View view, final int position, long id) {
-
-                AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
-                builder.setTitle("Delete");
-                builder.setMessage("Are you sure you want to delete?");
-                builder.setCancelable(false);
-                builder.setPositiveButton("Yes", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        TodoClass todo = todoArrayList.get(position);
-                        int todoId = todo.getId();
-                        deleteRowFromList(todoId);
-//                        View view = (View) spinner.getSelectedItem();
-//                        fetchAllTodo();
-//                        if(spinner.getSelectedItemPosition() == 0){
-//                            fetchAllTodo();
-//                        }
-//                        else{
-//                            spinner.setSelection(((ArrayAdapter)spinner.getAdapter()).getPosition("All"));
-//                        }
-                        showSelectedCategory(spinner.getSelectedItemPosition());
-                        todoListView.setTranscriptMode(ListView.TRANSCRIPT_MODE_NORMAL);
-
-                    }
-                });
-
-                builder.setNegativeButton("No", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.dismiss();
-                    }
-                });
-
-                builder.create().show();
-
-                return true;
-            }
-        });
-
-
-        todoListArrayAdapter.setCheckBoxClickedListener(this);
-
-
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.add_fab);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -205,146 +135,66 @@ public class MainActivity extends AppCompatActivity implements CheckBoxClickedLi
             }
         });
 
-//        fetchAllTodo();
+    }
 
 
-//        SharedPreferences sharedPreferences = getSharedPreferences(TODO_SHARED_PREF, MODE_PRIVATE);
-//        String allTitle = sharedPreferences.getString(TITLE_SHARED_PREF_KEY, null);
-//        String allDate = sharedPreferences.getString(DATE_SHARED_PREF_KEY, null);
-//
-//        String title[];
-//        String date[];
-//
-//        if(allTitle != null && allDate != null){
-//            title = allTitle.split(";");
-//            date = allDate.split(";");
-//            isSharedPrefEmpty = false;
-//
-//            for(int i = 0; i<title.length; i++){
-//                todoArrayList.add(new TodoClass(title[i], date[i]));
-//            }
-//        }
-//
-//        if(todoArrayList.isEmpty()){
-//            todoListView.setVisibility(View.GONE);
-//            noTodoTextView.setVisibility(View.VISIBLE);
-//        }
-//        else{
-//            noTodoTextView.setVisibility(View.GONE);
-//            todoListView.setVisibility(View.VISIBLE);
-//            todoListArrayAdapter.notifyDataSetChanged();
-//        }
-//
-//        todoListView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
-//            @Override
-//            public boolean onItemLongClick(AdapterView<?> parent, View view, final int position, long id) {
-//
-//                AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
-//                builder.setTitle("Delete");
-//                builder.setMessage("Are you sure you want to delete it?");
-//                builder.setCancelable(false);
-//                builder.setPositiveButton("Yes", new DialogInterface.OnClickListener() {
-//                    @Override
-//                    public void onClick(DialogInterface dialog, int which) {
-//                        todoArrayList.remove(position);
-//                        if(todoArrayList.isEmpty()){
-//                            todoListView.setVisibility(View.GONE);
-//                            noTodoTextView.setVisibility(View.VISIBLE);
-//                        }else {
-//                            noTodoTextView.setVisibility(View.GONE);
-//                            todoListView.setVisibility(View.VISIBLE);
-//                        }
-//                        todoListArrayAdapter.notifyDataSetChanged();
-//
-//                        updateSharedPref();
-//                    }
-//                });
-//                builder.setNegativeButton("No", new DialogInterface.OnClickListener() {
-//                    @Override
-//                    public void onClick(DialogInterface dialog, int which) {
-//                        dialog.dismiss();
-//                    }
-//                });
-//                builder.create().show();
-//                return true;
-//0
-//            }
-//        });
+    private boolean readDataAfterQuery(Cursor cursor){
+
+        boolean isQueryEmpty = true;
+
+        while (cursor.moveToNext()) {
+            isQueryEmpty = false;
+            int id = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_ID));
+            String task = cursor.getString(cursor.getColumnIndex(TodoOpenHelper.TODO_TASK));
+            String category = cursor.getString(cursor.getColumnIndex(TodoOpenHelper.TODO_CATEGORY));
+            long time = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_TIME));
+            long date = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_DATE));
+            int status = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_STATUS));
+            todoArrayList.add(new TodoClass(id, task, date, time, category, status));
+        }
+        return isQueryEmpty;
 
     }
 
 
-    private void showSelectedCategory(int position) {
+    private void showSpinnerSelectedCategory(int position) {
 
-        boolean isQueryEmpty = true;
+        boolean isQueryEmpty;
+        SQLiteDatabase database = TodoOpenHelper.getOpenHelperInstance(this).getReadableDatabase();
 
 
         if (position == 0) {
             fetchAllTodo();
             return;
-        }else if(spinnerList.get(position).equalsIgnoreCase("Finished")){
+        } else if (spinnerList.get(position).equalsIgnoreCase("Finished")) {
             todoArrayList.clear();
-            SQLiteDatabase database = TodoOpenHelper.getOpenHelperInstance(this).getReadableDatabase();
-            Cursor cursor = database.query(TodoOpenHelper.TODO_TABLE, null, TodoOpenHelper.TODO_STATUS + " = "+TodoOpenHelper.DONE,null, null, null, null);
-            while(cursor.moveToNext()){
-                isQueryEmpty = false;
-                int id = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_ID));
-                String task = cursor.getString(cursor.getColumnIndex(TodoOpenHelper.TODO_TASK));
-                String category = cursor.getString(cursor.getColumnIndex(TodoOpenHelper.TODO_CATEGORY));
-                long time = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_TIME));
-                long date = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_DATE));
-                int status = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_STATUS));
-                todoArrayList.add(new TodoClass(id, task, date, time, category, status));
-            }
+            Cursor cursor = database.query(TodoOpenHelper.TODO_TABLE, null, TodoOpenHelper.TODO_STATUS + " = " + TodoOpenHelper.DONE, null, null, null, null);
+            isQueryEmpty = readDataAfterQuery(cursor);
             cursor.close();
-        }
-        else {
+        } else {
             todoArrayList.clear();
-            SQLiteDatabase database = TodoOpenHelper.getOpenHelperInstance(this).getReadableDatabase();
-            String argument[] = {spinnerList.get(position), ""+TodoOpenHelper.NOT_DONE};
-            Cursor cursor = database.query(TodoOpenHelper.TODO_TABLE, null ,TodoOpenHelper.TODO_CATEGORY + " = ? AND "+TodoOpenHelper.TODO_STATUS + " = ?",
+
+            String argument[] = {spinnerList.get(position), "" + TodoOpenHelper.NOT_DONE};
+            Cursor cursor = database.query(TodoOpenHelper.TODO_TABLE, null, TodoOpenHelper.TODO_CATEGORY + " = ? AND " + TodoOpenHelper.TODO_STATUS + " = ?",
                     argument, null, null, null);
-            while (cursor.moveToNext()) {
-                isQueryEmpty = false;
-                int id = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_ID));
-                String task = cursor.getString(cursor.getColumnIndex(TodoOpenHelper.TODO_TASK));
-                String category = cursor.getString(cursor.getColumnIndex(TodoOpenHelper.TODO_CATEGORY));
-                long time = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_TIME));
-                long date = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_DATE));
-                int status = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_STATUS));
-                todoArrayList.add(new TodoClass(id, task, date, time, category, status));
-            }
+            isQueryEmpty = readDataAfterQuery(cursor);
             cursor.close();
 
         }
 
-
-        todoListArrayAdapter.notifyDataSetChanged();
+        todoAdapter.notifyDataSetChanged();
 
         if (isQueryEmpty) {
-            todoListView.setVisibility(View.GONE);
+            todoRecyclerView.setVisibility(View.GONE);
             noTodoTextView.setVisibility(View.VISIBLE);
         } else {
             noTodoTextView.setVisibility(View.GONE);
-            todoListView.setVisibility(View.VISIBLE);
+            todoRecyclerView.setVisibility(View.VISIBLE);
 
 
         }
 
-//        SQLiteDatabase database = TodoOpenHelper.getOpenHelperInstance(this).getReadableDatabase();
-//        Cursor cursor = database.query(TodoOpenHelper.TODO_TABLE, null, TodoOpenHelper.TODO_CATEGORY + " = "+ spinnerList.get(position)
-//        , null, null, null,null);
-//        todoArrayList.clear();
-//
-//        while(cursor.moveToNext()){
-//            String title = cursor.getString(cursor.getColumnIndex(TodoOpenHelper.TODO_TASK));
-//            int id = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_ID));
-//            long date = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_DATE));
-//            long time = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_TIME));
-//            todoArrayList.add(new TodoClass(id,title, date, time));
-//        }
 
-//        todoListArrayAdapter.notifyDataSetChanged();
     }
 
 
@@ -353,27 +203,106 @@ public class MainActivity extends AppCompatActivity implements CheckBoxClickedLi
         database.delete(TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_ID + " = " + todoId, null);
     }
 
-//
-//    @Override
-//    public boolean onCreateOptionsMenu(Menu menu) {
-//        getMenuInflater().inflate(R.menu.main_menu, menu);
-//
-//        return true;
-//    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.main_menu, menu);
+        return true;
+    }
 
 
-//    @Override
-//    public boolean onOptionsItemSelected(MenuItem item) {
-//
-//        if (item.getItemId() == R.id.menu_add) {
-//            Intent intent = new Intent(MainActivity.this, AddTodoActivity.class);
-//            intent.putExtra(IntentConstants.REQ_KEY, ADD_REQ_CODE);
-//            startActivityForResult(intent, ADD_REQ_CODE);
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+//        SubMenu subMenu = item.getSubMenu();
+//        id = subMenu.getItem()
+
+        SQLiteDatabase database = TodoOpenHelper.getOpenHelperInstance(this).getWritableDatabase();
+
+        int status = FAIL;
+
+        if (id == R.id.menu_delete_all) {
+            status = deleteRowByCategory("All");
+//            Log.i("menu", "status ="+);
+        }else if(id == R.id.menu_delete_general){
+            status = deleteRowByCategory("General");
+//            Log.i("menu", "status ="+status[0]);
+
+        }else if(id == R.id.menu_delete_personal){
+            status = deleteRowByCategory("Personal");
+
+        }else if(id == R.id.menu_delete_home){
+            status = deleteRowByCategory("Home");
+
+        }else if(id == R.id.menu_delete_work){
+            status = deleteRowByCategory("Work");
+
+        }else if(id == R.id.menu_delete_finished){
+            status = deleteRowByCategory("Finished");
+
+        }
+
+        if(status == SUCCESS){
+            Toast.makeText(this, "List Deleted", Toast.LENGTH_SHORT).show();
+            showSpinnerSelectedCategory(spinner.getSelectedItemPosition());
+        }
+
+
+
+
+
+
+//        Toast.makeText(this, "List deleted", Toast.LENGTH_SHORT).show();
+//        if(item.isChecked()){
+//            showSpinnerSelectedCategory(spinner.getSelectedItemPosition());
 //        }
-//
-//
-//        return true;
-//    }
+
+
+        return true;
+    }
+
+
+
+    private int deleteRowByCategory(String category) {
+
+        int status = FAIL;
+
+
+        final SQLiteDatabase database = TodoOpenHelper.getOpenHelperInstance(this).getReadableDatabase();
+        if(category.equalsIgnoreCase("Finished")){
+            if(getNoOfTodoDone(database) > 0){
+
+                database.delete(TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS+" = "+ TodoOpenHelper.DONE,null);
+                status = SUCCESS;
+
+            }else{
+                Toast.makeText(this, "List Empty", Toast.LENGTH_SHORT).show();
+            }
+        }else if(category.equalsIgnoreCase("All")){
+            if(getNoOfTodoNotDone(database) > 0){
+                database.delete(TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS+" = "+ TodoOpenHelper.NOT_DONE,null);
+                status = SUCCESS;
+
+
+            }else{
+                Toast.makeText(this, "List Empty", Toast.LENGTH_SHORT).show();
+            }
+        }else{
+            if(getNoOfTodoNotDone(database) > 0){
+                final String arguments[] = {""+TodoOpenHelper.NOT_DONE, category };
+
+                database.delete(TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS+" = ? AND "+ TodoOpenHelper.TODO_CATEGORY + " = ?",arguments);
+                status = SUCCESS;
+            }
+            else{
+                Toast.makeText(this, "List Empty", Toast.LENGTH_SHORT).show();
+            }
+        }
+
+        return status;
+
+
+    }
 
 
     @Override
@@ -382,85 +311,37 @@ public class MainActivity extends AppCompatActivity implements CheckBoxClickedLi
         Log.d("onActivityResult_tag", "in onActivty");
         if (requestCode == ADD_REQ_CODE && resultCode == RESULT_OK) {
 
-
             noTodoTextView.setVisibility(View.GONE);
-            todoListView.setVisibility(View.VISIBLE);
+            todoRecyclerView.setVisibility(View.VISIBLE);
             addNewTodo();
             spinner.setSelection(((ArrayAdapter) spinner.getAdapter()).getPosition("All"));
-            todoListView.setTranscriptMode(ListView.TRANSCRIPT_MODE_ALWAYS_SCROLL);
+            todoRecyclerView.scrollToPosition(todoAdapter.getItemCount());
 
-//
-//            String title = data.getStringExtra(IntentConstants.TODO_TITLE);
-//            String date = data.getStringExtra(IntentConstants.TODO_DATE);
-//            todoArrayList.add(todoArrayList.size(), new TodoClass(title, date));
-//            todoListArrayAdapter.notifyDataSetChanged();
-//            SharedPreferences sharedPreferences = getSharedPreferences(TODO_SHARED_PREF, MODE_PRIVATE);
-//            SharedPreferences.Editor editor = sharedPreferences.edit();
-//            editor.putString(TITLE_SHARED_PREF_KEY,sharedPreferences.getString(TITLE_SHARED_PREF_KEY,"")+title+";");
-//            editor.putString(DATE_SHARED_PREF_KEY, sharedPreferences.getString(DATE_SHARED_PREF_KEY,"")+date+";");
-//            editor.apply();
         } else if (requestCode == EDIT_REQ_CODE && resultCode == RESULT_OK) {
+
             fetchAllTodo();
             spinner.setSelection(((ArrayAdapter) spinner.getAdapter()).getPosition("All"));
-            todoListView.setTranscriptMode(ListView.TRANSCRIPT_MODE_NORMAL);
-
 
         }
     }
-
-//    private void updateSharedPref() {
-//        String title = "";
-//        String date = "";
-//        SharedPreferences.Editor editor = getSharedPreferences(TODO_SHARED_PREF, MODE_PRIVATE).edit();
-//        if (todoArrayList.isEmpty()) {
-//            editor.clear().apply();
-//            isSharedPrefEmpty = true;
-//
-//        } else {
-//            for (int i = 0; i < todoArrayList.size(); i++) {
-//                TodoClass todoClass = todoArrayList.get(i);
-//                title = title + todoClass.getTitle() + ";";
-//                date = date + todoClass.getDate() + ";";
-//            }
-//            editor.putString(TITLE_SHARED_PREF_KEY, title);
-//            editor.putString(DATE_SHARED_PREF_KEY, date);
-//            editor.apply();
-//        }
-//
-//    }
 
 
     private void fetchAllTodo() {
 
         SQLiteDatabase database = TodoOpenHelper.getOpenHelperInstance(this).getReadableDatabase();
         todoArrayList.clear();
-        todoListArrayAdapter.notifyDataSetChanged();
+        todoAdapter.notifyDataSetChanged();
 
-//        Cursor cursor = database.rawQuery("SELECT COUNT(*) FROM TABLE "+TodoOpenHelper.TODO_TABLE, null);
-//        cursor.moveToFirst();
-        if (getNoOfDoneTodo(database) > 0) {
+        if (getNoOfTodoNotDone(database) > 0) {
             todoArrayList.clear();
             noTodoTextView.setVisibility(View.GONE);
-            todoListView.setVisibility(View.VISIBLE);
+            todoRecyclerView.setVisibility(View.VISIBLE);
             Cursor cursor = database.query(TodoOpenHelper.TODO_TABLE, null, TodoOpenHelper.TODO_STATUS + " = 0", null, null, null, null);
-            while (cursor.moveToNext()) {
-                int id = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_ID));
-                String task = cursor.getString(cursor.getColumnIndex(TodoOpenHelper.TODO_TASK));
-
-
-                long date = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_DATE));
-                long time = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_TIME));
-                String category = cursor.getString(cursor.getColumnIndex(TodoOpenHelper.TODO_CATEGORY));
-                int status = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_STATUS));
-
-
-                todoArrayList.add(new TodoClass(id, task, date, time, category, status));
-                todoListArrayAdapter.notifyDataSetChanged();
-
-            }
+            readDataAfterQuery(cursor);
+            todoAdapter.notifyDataSetChanged();
             cursor.close();
         } else {
-            todoListView.setVisibility(View.GONE);
+            todoRecyclerView.setVisibility(View.GONE);
             noTodoTextView.setVisibility(View.VISIBLE);
 
         }
@@ -474,27 +355,30 @@ public class MainActivity extends AppCompatActivity implements CheckBoxClickedLi
         cursor.moveToLast();
         int id = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_ID));
         String task = cursor.getString(cursor.getColumnIndex(TodoOpenHelper.TODO_TASK));
-
         long date = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_DATE));
         long time = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_TIME));
         String category = cursor.getString(cursor.getColumnIndex(TodoOpenHelper.TODO_CATEGORY));
-
         todoArrayList.add(new TodoClass(id, task, date, time, category, TodoOpenHelper.NOT_DONE));
-        todoListArrayAdapter.notifyDataSetChanged();
+        todoAdapter.notifyDataSetChanged();
         cursor.close();
 
     }
 
-    private void updateTodoList() {
 
+
+    private long getNoOfTodoNotDone(SQLiteDatabase database) {
+
+
+        return DatabaseUtils.queryNumEntries(database, TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS + " = "+TodoOpenHelper.NOT_DONE);
 
     }
 
-    private long getNoOfDoneTodo(SQLiteDatabase database) {
+    private long getNoOfTodoDone(SQLiteDatabase database){
+        return DatabaseUtils.queryNumEntries(database, TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS + " = "+TodoOpenHelper.DONE);
+    }
 
-
-        return DatabaseUtils.queryNumEntries(database, TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS + " = 0");
-
+    private long getTotalNoOfTodo(SQLiteDatabase database){
+        return DatabaseUtils.queryNumEntries(database, TodoOpenHelper.TODO_TABLE,null);
     }
 
 
@@ -504,11 +388,10 @@ public class MainActivity extends AppCompatActivity implements CheckBoxClickedLi
         TodoClass todo = todoArrayList.get(position);
         final int id = todo.getId();
 
-        Log.i("listAdapter", "checked fun ="+checkBox.isChecked());
+        Log.i("listAdapter", "checked fun =" + checkBox.isChecked());
 
 
-
-        if(checkBox.isChecked()){
+        if (checkBox.isChecked()) {
             AlertDialog.Builder builder = new AlertDialog.Builder(this);
             builder.setTitle("Edit");
             builder.setMessage("Task finished?");
@@ -519,7 +402,7 @@ public class MainActivity extends AppCompatActivity implements CheckBoxClickedLi
                     SQLiteDatabase database = TodoOpenHelper.getOpenHelperInstance(MainActivity.this).getWritableDatabase();
                     ContentValues cv = new ContentValues();
                     cv.put(TodoOpenHelper.TODO_STATUS, TodoOpenHelper.DONE);
-                    database.update(TodoOpenHelper.TODO_TABLE, cv, TodoOpenHelper.TODO_ID + " = "+id, null);
+                    database.update(TodoOpenHelper.TODO_TABLE, cv, TodoOpenHelper.TODO_ID + " = " + id, null);
 //                fetchAllTodo();
 //                spinner.setSelection(((ArrayAdapter)spinner.getAdapter()).getPosition("All"));
 //                    if(spinner.getSelectedItemPosition() == 0){
@@ -528,7 +411,7 @@ public class MainActivity extends AppCompatActivity implements CheckBoxClickedLi
 //                    else{
 //                        spinner.setSelection(((ArrayAdapter)spinner.getAdapter()).getPosition("All"));
 //                    }
-                    showSelectedCategory(spinner.getSelectedItemPosition());
+                    showSpinnerSelectedCategory(spinner.getSelectedItemPosition());
 
                 }
             });
@@ -542,8 +425,7 @@ public class MainActivity extends AppCompatActivity implements CheckBoxClickedLi
 
             builder.create().show();
 
-        }
-        else{
+        } else {
 
             AlertDialog.Builder builder = new AlertDialog.Builder(this);
             builder.setTitle("Edit");
@@ -555,7 +437,7 @@ public class MainActivity extends AppCompatActivity implements CheckBoxClickedLi
                     SQLiteDatabase database = TodoOpenHelper.getOpenHelperInstance(MainActivity.this).getWritableDatabase();
                     ContentValues cv = new ContentValues();
                     cv.put(TodoOpenHelper.TODO_STATUS, TodoOpenHelper.NOT_DONE);
-                    database.update(TodoOpenHelper.TODO_TABLE, cv, TodoOpenHelper.TODO_ID + " = "+id, null);
+                    database.update(TodoOpenHelper.TODO_TABLE, cv, TodoOpenHelper.TODO_ID + " = " + id, null);
 //                fetchAllTodo();
 //                spinner.setSelection(((ArrayAdapter)spinner.getAdapter()).getPosition("All"));
 //                    if(spinner.getSelectedItemPosition() == 0){
@@ -564,7 +446,7 @@ public class MainActivity extends AppCompatActivity implements CheckBoxClickedLi
 //                    else{
 //                        spinner.setSelection(((ArrayAdapter)spinner.getAdapter()).getPosition("All"));
 //                    }
-                    showSelectedCategory(spinner.getSelectedItemPosition());
+                    showSpinnerSelectedCategory(spinner.getSelectedItemPosition());
 
                 }
             });
@@ -581,10 +463,57 @@ public class MainActivity extends AppCompatActivity implements CheckBoxClickedLi
         }
 
 
+    }
+
+
+    @Override
+    public void onTodoViewHolderClicked(View view) {
+        int position = todoRecyclerView.getChildLayoutPosition(view);
+
+        TodoClass todo = todoArrayList.get(position);
+
+        Intent intent = new Intent(MainActivity.this, AddTodoActivity.class);
+        intent.putExtra(IntentConstants.REQ_KEY, EDIT_REQ_CODE);
+        intent.putExtra(IntentConstants.TODO_TITLE, todo.getTitle());
+        intent.putExtra(IntentConstants.TODO_DATE, todo.getDate());
+        intent.putExtra(IntentConstants.TODO_ID, todo.getId());
+        intent.putExtra(IntentConstants.TODO_STATUS, todo.getStatus());
+
+        startActivityForResult(intent, EDIT_REQ_CODE);
+    }
+
+    @Override
+    public void onTodoViewHolderLongClicked(View view) {
+        final int position = todoRecyclerView.getChildLayoutPosition(view);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+        builder.setTitle("Delete");
+        builder.setMessage("Are you sure you want to delete?");
+        builder.setCancelable(false);
+        builder.setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                TodoClass todo = todoArrayList.get(position);
+                int todoId = todo.getId();
+                deleteRowFromList(todoId);
+                showSpinnerSelectedCategory(spinner.getSelectedItemPosition());
+
+            }
+        });
+
+        builder.setNegativeButton("No", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.dismiss();
+            }
+        });
+
+        builder.create().show();
 
 
     }
 
 
-
 }
+
+

@@ -3,28 +3,29 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true"
     android:orientation="vertical"
+    android:fillViewport="true"
     app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
     <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent">
 
-        >
+        <!--<ListView-->
 
-        <ListView
+        <!--android:id="@+id/activity_main_list_view"-->
+        <!--android:layout_width="match_parent"-->
+        <!--android:layout_height="wrap_content"-->
+        <!--android:layout_below="@id/main_spinner"-->
+        <!--android:layout_marginLeft="8dp"-->
+        <!--android:layout_marginRight="8dp"-->
+        <!--android:nestedScrollingEnabled="true"-->
+        <!--android:scrollbars="none">-->
 
-            android:id="@+id/activity_main_list_view"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_below="@id/main_spinner"
-            android:layout_marginLeft="8dp"
-            android:layout_marginRight="8dp"
-            android:nestedScrollingEnabled="true"
-            android:scrollbars="none">
+        <!--</ListView>-->
 
-        </ListView>
+
+
 
         <TextView
 
@@ -35,7 +36,7 @@
             android:text="Nothing to do"
             android:textColor="?attr/colorPrimary"
             android:textSize="20sp"
-            android:visibility="gone" />
+            android:visibility="visible" />
     </RelativeLayout>
 
 

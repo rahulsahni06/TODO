@@ -12,34 +12,28 @@
         <item name="colorPrimary">@color/todoColorPrimary</item>
         <item name="colorPrimaryDark">@color/todoColorPrimaryDark</item>
         <item name="colorAccent">@color/todoColorAccent</item>
-    </style>
 
+    </style>
 
     <style name="TodoTheme.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
 
     </style>
 
-    <style name="AppTheme.AppBarOverlay" parent="ThemeOverlay.AppCompat.Dark.ActionBar" />
+    <style name="TodoTheme.AppBarOverlay" parent="ThemeOverlay.AppCompat.Dark.ActionBar" />
 
-    <!--<style name="TodoThemeMainActivity" parent="Theme.AppCompat.Light.NoActionBar">-->
-        <!--<item name="colorPrimary">@color/todoColorPrimary</item>-->
-        <!--<item name="colorPrimaryDark">@color/todoColorPrimaryDark</item>-->
-        <!--<item name="colorAccent">@color/todoColorAccent</item>-->
+    <style name="TodoTheme.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
 
-    <!--</style>-->
-
-    <style name="TextAppearance.AppCompat.Widget.TextView.SpinnerItem.MySpinnerText">
-        <item name="android:textColor">@android:color/white</item>
+    <style name="SpinnerItemPopupOverlay" parent="ThemeOverlay.AppCompat.Light">
+        <!--<item name="android:background">?attr/colorPrimary</item>-->
+        <!--<item name="android:textColor">?attr/colorPrimary</item>-->
+        <!--<item name="android:textStyle">bold</item>-->
+        <!--<item name="android:layout_gravity">center</item>-->
+        <!--<item name="android:gravity">center</item>-->
     </style>
 
 
-
-    <style name="Widget.AppCompat.TextView.SpinnerItem.MySpinnerItem">
-        <!--<item name="android:paddingLeft">50dp</item>-->
-        <item name="android:background">?attr/colorPrimary</item>
-        <!--<item name="android:paddingRight">20dp</item>-->
-        <item name="android:textAppearance">@style/TextAppearance.AppCompat.Widget.TextView.SpinnerItem.MySpinnerText</item>
-    </style>
 
 
 

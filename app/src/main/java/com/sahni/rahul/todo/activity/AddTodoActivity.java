@@ -32,10 +32,10 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 
-import static com.sahni.rahul.todo.helpers.EpochToDate.NO_DATE_SELECTED;
-import static com.sahni.rahul.todo.helpers.EpochToDate.NO_TIME_SELECTED;
-import static com.sahni.rahul.todo.helpers.EpochToDate.convert;
-import static com.sahni.rahul.todo.helpers.EpochToDate.convertTime;
+import static com.sahni.rahul.todo.helpers.EpochToDateTime.NO_DATE_SELECTED;
+import static com.sahni.rahul.todo.helpers.EpochToDateTime.NO_TIME_SELECTED;
+import static com.sahni.rahul.todo.helpers.EpochToDateTime.convert;
+import static com.sahni.rahul.todo.helpers.EpochToDateTime.convertTime;
 
 public class AddTodoActivity extends AppCompatActivity {
     static int i =0;

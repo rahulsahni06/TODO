@@ -12,7 +12,7 @@ import android.widget.CheckBox;
 import android.widget.TextView;
 
 import com.sahni.rahul.todo.interfaces.CheckBoxClickedListener;
-import com.sahni.rahul.todo.helpers.EpochToDate;
+import com.sahni.rahul.todo.helpers.EpochToDateTime;
 import com.sahni.rahul.todo.R;
 import com.sahni.rahul.todo.models.TodoClass;
 import com.sahni.rahul.todo.database.TodoOpenHelper;
@@ -78,12 +78,12 @@ public class TodoListArrayAdapter extends ArrayAdapter<TodoClass> {
         long date = todoClass.getDate();
         long time = todoClass.getTime();
 
-        if(EpochToDate.convert(date).equalsIgnoreCase("Today") &&  (time > System.currentTimeMillis() || time == EpochToDate.NO_TIME_SELECTED)){
+        if(EpochToDateTime.convert(date).equalsIgnoreCase("Today") &&  (time > System.currentTimeMillis() || time == EpochToDateTime.NO_TIME_SELECTED)){
             todoViewHolder.dateTextView.setTextColor(ContextCompat.getColor(context, R.color.todoColorPrimary));
             todoViewHolder.timeTextView.setTextColor(ContextCompat.getColor(context, R.color.todoColorPrimary));
         }
-        else if((time != EpochToDate.NO_TIME_SELECTED && time < System.currentTimeMillis())
-                || (time == EpochToDate.NO_TIME_SELECTED && date < System.currentTimeMillis())){
+        else if((time != EpochToDateTime.NO_TIME_SELECTED && time < System.currentTimeMillis())
+                || (time == EpochToDateTime.NO_TIME_SELECTED && date < System.currentTimeMillis())){
             todoViewHolder.dateTextView.setTextColor(ContextCompat.getColor(context, android.R.color.holo_red_light));
             todoViewHolder.timeTextView.setTextColor(ContextCompat.getColor(context, android.R.color.holo_red_light));
         }
@@ -93,8 +93,8 @@ public class TodoListArrayAdapter extends ArrayAdapter<TodoClass> {
             todoViewHolder.timeTextView.setTextColor(oldColor);
         }
 
-        todoViewHolder.dateTextView.setText(EpochToDate.convert(todoClass.getDate()));
-        todoViewHolder.timeTextView.setText(EpochToDate.convertTime(todoClass.getTime()));
+        todoViewHolder.dateTextView.setText(EpochToDateTime.convert(todoClass.getDate()));
+        todoViewHolder.timeTextView.setText(EpochToDateTime.convertTime(todoClass.getTime()));
         todoViewHolder.categoryTextView.setText(todoClass.getCategory());
 
         todoViewHolder.statusCheckBox.setOnClickListener(new View.OnClickListener() {
