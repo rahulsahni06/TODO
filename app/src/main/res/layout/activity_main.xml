@@ -24,7 +24,7 @@
         android:id="@+id/main_spinner"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        style="@style/Widget.AppCompat.TextView.SpinnerItem.MySpinnerItem"
+        app:theme="@style/Widget.AppCompat.TextView.SpinnerItem.MySpinnerItem"
 
         />
 

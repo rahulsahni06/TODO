@@ -36,7 +36,7 @@
 
     <style name="Widget.AppCompat.TextView.SpinnerItem.MySpinnerItem">
         <!--<item name="android:paddingLeft">50dp</item>-->
-        <item name="android:background">?attr/colorPrimary</item>
+        <!--<item name="android:background">?attr/colorPrimary</item>-->
         <!--<item name="android:paddingRight">20dp</item>-->
         <item name="android:textAppearance">@style/TextAppearance.AppCompat.Widget.TextView.SpinnerItem.MySpinnerText</item>
     </style>
