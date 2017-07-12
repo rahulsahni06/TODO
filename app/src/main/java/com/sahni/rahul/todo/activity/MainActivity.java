@@ -8,6 +8,7 @@ import android.database.DatabaseUtils;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
+import android.support.design.widget.Snackbar;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -24,7 +25,6 @@ import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
 import android.widget.Spinner;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.sahni.rahul.todo.R;
 import com.sahni.rahul.todo.adapter.TodoRecyclerAdapter;
@@ -40,14 +40,6 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
 
     public static final int ADD_REQ_CODE = 1;
     public static final int EDIT_REQ_CODE = 2;
-    public static final String TODO_SHARED_PREF = "todo_shared_pref";
-    public static final String TITLE_SHARED_PREF_KEY = "title_key";
-    public static final String DATE_SHARED_PREF_KEY = "Date_key";
-
-    public static final int SUCCESS = 1;
-    public static final int FAIL = 0;
-
-
 
 
     ArrayList<TodoClass> todoArrayList;
@@ -214,92 +206,107 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
-//        SubMenu subMenu = item.getSubMenu();
-//        id = subMenu.getItem()
 
-        SQLiteDatabase database = TodoOpenHelper.getOpenHelperInstance(this).getWritableDatabase();
-
-        int status = FAIL;
 
         if (id == R.id.menu_delete_all) {
-            status = deleteRowByCategory("All");
-//            Log.i("menu", "status ="+);
+            deleteRowByCategory("All");
+
         }else if(id == R.id.menu_delete_general){
-            status = deleteRowByCategory("General");
-//            Log.i("menu", "status ="+status[0]);
+            deleteRowByCategory("General");
 
         }else if(id == R.id.menu_delete_personal){
-            status = deleteRowByCategory("Personal");
+            deleteRowByCategory("Personal");
+
 
         }else if(id == R.id.menu_delete_home){
-            status = deleteRowByCategory("Home");
+            deleteRowByCategory("Home");
 
         }else if(id == R.id.menu_delete_work){
-            status = deleteRowByCategory("Work");
+            deleteRowByCategory("Work");
+
 
         }else if(id == R.id.menu_delete_finished){
-            status = deleteRowByCategory("Finished");
+            deleteRowByCategory("Finished");
+
 
         }
-
-        if(status == SUCCESS){
-            Toast.makeText(this, "List Deleted", Toast.LENGTH_SHORT).show();
-            showSpinnerSelectedCategory(spinner.getSelectedItemPosition());
-        }
-
-
-
-
-
-
-//        Toast.makeText(this, "List deleted", Toast.LENGTH_SHORT).show();
-//        if(item.isChecked()){
-//            showSpinnerSelectedCategory(spinner.getSelectedItemPosition());
-//        }
-
 
         return true;
     }
 
 
+    private void showDeleteCategoryAlert(final String category, final SQLiteDatabase database){
 
-    private int deleteRowByCategory(String category) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Delete");
+        builder.setMessage("Are you sure you want to delete "+"\""+category+"\" list?");
+        builder.setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
 
-        int status = FAIL;
+                if(category.equalsIgnoreCase("Finished")){
+
+                    database.delete(TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS+" = "+ TodoOpenHelper.DONE,null);
+
+                }
+                else if(category.equalsIgnoreCase("All")){
+                    database.delete(TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS+" = "+ TodoOpenHelper.NOT_DONE,null);
+                }
+                else{
+
+                    String arguments[] = {""+TodoOpenHelper.NOT_DONE, category };
+
+                    database.delete(TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS+" = ? AND "+ TodoOpenHelper.TODO_CATEGORY + " = ?",arguments);
+
+                }
+
+                Snackbar.make(todoRecyclerView, category+" List deleted", Snackbar.LENGTH_SHORT ).show();
+                showSpinnerSelectedCategory(spinner.getSelectedItemPosition());
+
+            }
+        });
+
+        builder.setNegativeButton("No", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.dismiss();
+            }
+        });
+
+        builder.create().show();
+
+    }
+
+
+
+    private void deleteRowByCategory(String category) {
 
 
         final SQLiteDatabase database = TodoOpenHelper.getOpenHelperInstance(this).getReadableDatabase();
         if(category.equalsIgnoreCase("Finished")){
             if(getNoOfTodoDone(database) > 0){
-
-                database.delete(TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS+" = "+ TodoOpenHelper.DONE,null);
-                status = SUCCESS;
+                showDeleteCategoryAlert("Finished", database);
 
             }else{
-                Toast.makeText(this, "List Empty", Toast.LENGTH_SHORT).show();
+                Snackbar.make(todoRecyclerView, "List Empty", Snackbar.LENGTH_SHORT ).show();
             }
         }else if(category.equalsIgnoreCase("All")){
             if(getNoOfTodoNotDone(database) > 0){
-                database.delete(TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS+" = "+ TodoOpenHelper.NOT_DONE,null);
-                status = SUCCESS;
+                showDeleteCategoryAlert("All", database);
 
 
             }else{
-                Toast.makeText(this, "List Empty", Toast.LENGTH_SHORT).show();
+                Snackbar.make(todoRecyclerView, "List Empty", Snackbar.LENGTH_SHORT ).show();
             }
         }else{
-            if(getNoOfTodoNotDone(database) > 0){
-                final String arguments[] = {""+TodoOpenHelper.NOT_DONE, category };
-
-                database.delete(TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS+" = ? AND "+ TodoOpenHelper.TODO_CATEGORY + " = ?",arguments);
-                status = SUCCESS;
+            if(getNoOfTodoInCategory(database, category) > 0){
+                showDeleteCategoryAlert(category, database);
             }
             else{
-                Toast.makeText(this, "List Empty", Toast.LENGTH_SHORT).show();
+                Snackbar.make(todoRecyclerView, "List Empty", Snackbar.LENGTH_SHORT ).show();
             }
         }
 
-        return status;
 
 
     }
@@ -377,8 +384,11 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
         return DatabaseUtils.queryNumEntries(database, TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS + " = "+TodoOpenHelper.DONE);
     }
 
-    private long getTotalNoOfTodo(SQLiteDatabase database){
-        return DatabaseUtils.queryNumEntries(database, TodoOpenHelper.TODO_TABLE,null);
+    private long getNoOfTodoInCategory(SQLiteDatabase database, String category){
+
+        String arguments[] = {""+TodoOpenHelper.NOT_DONE, category };
+        return DatabaseUtils.queryNumEntries(database, TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS+" = ? AND "+ TodoOpenHelper.TODO_CATEGORY + " = ?",arguments);
+
     }
 
 
@@ -514,6 +524,11 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
     }
 
 
+
+
+
 }
+
+
 
 
