@@ -9,8 +9,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
+import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -21,6 +23,7 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.TimePicker;
 
 import com.sahni.rahul.todo.helpers.IntentConstants;
@@ -53,6 +56,7 @@ public class AddTodoActivity extends AppCompatActivity {
 
     ImageView calendarCancelImageView;
     ImageView timeCancelImageView;
+    TextView infoAlarmTextView;
 
     boolean isDateSet = false;
 
@@ -63,6 +67,7 @@ public class AddTodoActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
+        Log.i("back button", "back pressed");
         setResult(RESULT_CANCELED);
         super.onBackPressed();
     }
@@ -72,12 +77,21 @@ public class AddTodoActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_add_todo);
 
+        ActionBar actionBar = getSupportActionBar();
+
+        if(actionBar != null){
+            actionBar.setHomeButtonEnabled(true);
+            actionBar.setDisplayHomeAsUpEnabled(true);
+        }
+
+
 
 
         button = (Button) findViewById(R.id.submit_button);
         titleEditText = (EditText) findViewById(R.id.title_add_edit_text);
         dateEditText  = (EditText) findViewById(R.id.date_add_edit_text);
         timeEditText = (EditText) findViewById(R.id.time_add_edit_text);
+        infoAlarmTextView = (TextView) findViewById(R.id.info_set_alarm_text_view);
         final ImageView calendarImageView = (ImageView) findViewById(R.id.calendar_image_view);
         ImageView timeImageView = (ImageView) findViewById(R.id.time_image_view);
         calendarCancelImageView = (ImageView) findViewById(R.id.date_cancel_image_view);
@@ -119,6 +133,7 @@ public class AddTodoActivity extends AppCompatActivity {
             String title = intent.getStringExtra(IntentConstants.TODO_TITLE);
             dateInEpoch = intent.getLongExtra(IntentConstants.TODO_DATE, 0);
             int status = intent.getIntExtra(IntentConstants.TODO_STATUS, -1);
+            infoAlarmTextView.setVisibility(View.GONE);
 
 
             if(status == TodoOpenHelper.DONE){
@@ -175,6 +190,7 @@ public class AddTodoActivity extends AppCompatActivity {
                 dateEditText.setText("");
                 dateEditText.setHint("Date not set");
                 timeEditText.setText("");
+                infoAlarmTextView.setVisibility(View.VISIBLE);
                 calendarCancelImageView.setVisibility(View.GONE);
                 timeLayout.setVisibility(View.GONE);
 
@@ -209,15 +225,7 @@ public class AddTodoActivity extends AppCompatActivity {
 
                     if(title.trim().equals("")){
                         titleEditText.setError("Please enter title");
-
-//                        if(date.trim().equals("")){
-//                            dateEditText.setError("Please enter date");
-//
-//                        }
                     }
-//                    else if(date.trim().equals("")){
-//                        dateEditText.setError("Please enter date");
-//                    }
                     else{
                         Log.i("Add", "title= "+title);
                         Log.i("Add", "date= "+dateInEpoch);
@@ -286,6 +294,8 @@ public class AddTodoActivity extends AppCompatActivity {
                 calendarCancelImageView.setVisibility(View.VISIBLE);
                 timeLayout.setVisibility(View.VISIBLE);
                 timeEditText.setText("");
+                infoAlarmTextView.setVisibility(View.GONE);
+
             }
         },year , month, date);
 
@@ -311,5 +321,12 @@ public class AddTodoActivity extends AppCompatActivity {
 
     }
 
-
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if(item.getItemId() == android.R.id.home){
+            Log.i("home", "home pressed");
+            onBackPressed();
+        }
+        return  true;
+    }
 }

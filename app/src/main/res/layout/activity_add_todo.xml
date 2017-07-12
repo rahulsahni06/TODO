@@ -60,6 +60,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal">
         <EditText
+            android:hint="Date not set"
             android:focusable="false"
             android:id="@+id/date_add_edit_text"
             android:layout_width="0dp"
@@ -88,6 +89,13 @@
             android:src="@android:drawable/ic_menu_close_clear_cancel"/>
 
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/info_set_alarm_text_view"
+        android:gravity="center_horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="To get notification please set date"/>
     <LinearLayout
         android:visibility="gone"
         android:id="@+id/time_linear_layout"
