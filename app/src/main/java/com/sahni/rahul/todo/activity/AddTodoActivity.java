@@ -7,6 +7,7 @@ import android.app.TimePickerDialog;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.support.v7.app.ActionBar;
@@ -26,22 +27,31 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.TimePicker;
 
-import com.sahni.rahul.todo.helpers.IntentConstants;
-import com.sahni.rahul.todo.broadcastReceivers.MyTodoReceiver;
 import com.sahni.rahul.todo.R;
+import com.sahni.rahul.todo.broadcastReceivers.ShowNotificationReceiver;
 import com.sahni.rahul.todo.database.TodoOpenHelper;
+import com.sahni.rahul.todo.helpers.IntentConstants;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.Locale;
+import java.util.TimeZone;
 
-import static com.sahni.rahul.todo.helpers.EpochToDateTime.NO_DATE_SELECTED;
-import static com.sahni.rahul.todo.helpers.EpochToDateTime.NO_TIME_SELECTED;
+import static com.sahni.rahul.todo.database.DatabaseConstants.ALARM_NOT_SET;
+import static com.sahni.rahul.todo.database.DatabaseConstants.ALARM_SET;
+import static com.sahni.rahul.todo.database.DatabaseConstants.DATE_NOT_SET;
+import static com.sahni.rahul.todo.database.DatabaseConstants.TIME_NOT_SET;
+import static com.sahni.rahul.todo.database.DatabaseConstants.TODO_DONE;
+import static com.sahni.rahul.todo.database.DatabaseConstants.TODO_NOT_DONE;
 import static com.sahni.rahul.todo.helpers.EpochToDateTime.convert;
 import static com.sahni.rahul.todo.helpers.EpochToDateTime.convertTime;
+import static com.sahni.rahul.todo.helpers.SharedPrefConstants.PENDING_INTENT_ID;
+import static com.sahni.rahul.todo.helpers.SharedPrefConstants.PENDING_INTENT_ID_PREF;
 
 public class AddTodoActivity extends AppCompatActivity {
-    static int i =0;
 
     Button button;
     EditText titleEditText;
@@ -58,11 +68,9 @@ public class AddTodoActivity extends AppCompatActivity {
     ImageView timeCancelImageView;
     TextView infoAlarmTextView;
 
-    boolean isDateSet = false;
-
     Calendar calendar;
 
-    long dateInEpoch = NO_DATE_SELECTED , timeInEpoch= NO_TIME_SELECTED;
+    long dateInEpoch = DATE_NOT_SET , timeInEpoch= TIME_NOT_SET;
     String category;
 
     @Override
@@ -136,7 +144,7 @@ public class AddTodoActivity extends AppCompatActivity {
             infoAlarmTextView.setVisibility(View.GONE);
 
 
-            if(status == TodoOpenHelper.DONE){
+            if(status == TODO_DONE){
                 statusCheckBox.setVisibility(View.VISIBLE);
                 statusCheckBox.setChecked(true);
             }
@@ -184,8 +192,8 @@ public class AddTodoActivity extends AppCompatActivity {
         calendarCancelImageView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                dateInEpoch = NO_DATE_SELECTED ;
-                timeInEpoch = NO_TIME_SELECTED;
+                dateInEpoch = DATE_NOT_SET ;
+                timeInEpoch = TIME_NOT_SET;
 //                dateEditText.setBackground(ContextCompat.getDrawable(AddTodoActivity.this, android.R.color.darker_gray));
                 dateEditText.setText("");
                 dateEditText.setHint("Date not set");
@@ -200,7 +208,7 @@ public class AddTodoActivity extends AppCompatActivity {
         timeCancelImageView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                timeInEpoch = NO_TIME_SELECTED;
+                timeInEpoch = TIME_NOT_SET;
                 timeLayout.setVisibility(View.GONE);
             }
         });
@@ -210,7 +218,6 @@ public class AddTodoActivity extends AppCompatActivity {
             public void onClick(View v) {
 
                 String title = titleEditText.getText().toString();
-                String date = dateEditText.getText().toString();
 
                 SQLiteDatabase database = TodoOpenHelper.getOpenHelperInstance(AddTodoActivity.this).getWritableDatabase();
                 ContentValues cv = new ContentValues();
@@ -230,8 +237,18 @@ public class AddTodoActivity extends AppCompatActivity {
                         Log.i("Add", "title= "+title);
                         Log.i("Add", "date= "+dateInEpoch);
                         Log.i("Add", "time= "+timeInEpoch);
+
+                        if(timeInEpoch != TIME_NOT_SET){
+                            int pId = getPendingIntentId();
+                            cv.put(TodoOpenHelper.TODO_PENDING_INTENT_ID, pId);
+                            cv.put(TodoOpenHelper.TODO_ALARM_STATUS, ALARM_SET);
+                            setTodoNotification(pId, title);
+                            setPendingIntentId(++pId);
+
+                            Log.i("PENDING", "ID = "+pId);
+
+                        }
                         database.insert(TodoOpenHelper.TODO_TABLE, null, cv);
-                        setTodoNotification(timeInEpoch, title);
                         setResult(RESULT_OK);
                         finish();
                     }
@@ -242,15 +259,28 @@ public class AddTodoActivity extends AppCompatActivity {
 
                     if(statusCheckBox.getVisibility() == View.VISIBLE){
                         if(statusCheckBox.isChecked()){
-                            cv.put(TodoOpenHelper.TODO_STATUS, TodoOpenHelper.DONE);
+                            cv.put(TodoOpenHelper.TODO_STATUS, TODO_DONE);
                         }
                         else{
-                            cv.put(TodoOpenHelper.TODO_STATUS, TodoOpenHelper.NOT_DONE);
+                            cv.put(TodoOpenHelper.TODO_STATUS, TODO_NOT_DONE);
                         }
                     }
                     int id = intent.getIntExtra(IntentConstants.TODO_ID, -1);
+
+                    if(timeInEpoch != TIME_NOT_SET){
+//                        cv.put(TodoOpenHelper.TODO_PENDING_INTENT_ID, ++pendingIntentId);
+                        int pId = getPendingIntentId();
+                        cv.put(TodoOpenHelper.TODO_PENDING_INTENT_ID, pId);
+                        cv.put(TodoOpenHelper.TODO_ALARM_STATUS, ALARM_SET);
+                        setTodoNotification(pId, title);
+                        setPendingIntentId(++pId);
+
+                    }
+                    else{
+                        cv.put(TodoOpenHelper.TODO_PENDING_INTENT_ID, 0);
+                        cv.put(TodoOpenHelper.TODO_ALARM_STATUS, ALARM_NOT_SET);
+                    }
                     database.update(TodoOpenHelper.TODO_TABLE, cv, TodoOpenHelper.TODO_ID + " = "+id, null);
-                    setTodoNotification(timeInEpoch, title);
                     setResult(RESULT_OK);
                     finish();
                 }
@@ -264,14 +294,17 @@ public class AddTodoActivity extends AppCompatActivity {
     }
 
 
-    private void setTodoNotification(long milliSec, String title){
-        if(milliSec != NO_TIME_SELECTED){
-            AlarmManager alarmManager = (AlarmManager) this.getSystemService(Context.ALARM_SERVICE);
-            Intent intent = new Intent(this, MyTodoReceiver.class);
-            intent.putExtra(IntentConstants.TODO_TITLE, title);
-            PendingIntent pendingIntent = PendingIntent.getBroadcast(this, i++, intent, 0);
-            alarmManager.set(AlarmManager.RTC, timeInEpoch, pendingIntent);
-        }
+    private void setTodoNotification( int pendingIntentId, String title) {
+
+        Log.i("notification", "ID = "+pendingIntentId);
+
+        AlarmManager alarmManager = (AlarmManager) this.getSystemService(Context.ALARM_SERVICE);
+        Intent intent = new Intent(this, ShowNotificationReceiver.class);
+        intent.putExtra(IntentConstants.TODO_TITLE, title);
+        intent.putExtra(IntentConstants.TODO_PENDING_ID, pendingIntentId);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, pendingIntentId, intent, 0);
+        alarmManager.set(AlarmManager.RTC, timeInEpoch, pendingIntent);
+
     }
 
 
@@ -281,6 +314,10 @@ public class AddTodoActivity extends AppCompatActivity {
         int date = calendar.get(Calendar.DATE);
         int month = calendar.get(Calendar.MONTH);
         int year = calendar.get(Calendar.YEAR);
+        Log.i("Date picker", "Date = "+date);
+        Log.i("Date picker", "month = "+month);
+        Log.i("Date picker", "year = "+year);
+        Log.i("Date picker", "TIMEXNE = "+ TimeZone.getTimeZone(TimeZone.getDefault().getDisplayName()));
 
 
         DatePickerDialog dialog = new DatePickerDialog(AddTodoActivity.this, new DatePickerDialog.OnDateSetListener() {
@@ -288,7 +325,28 @@ public class AddTodoActivity extends AppCompatActivity {
             public void onDateSet(DatePicker view, int year, int month, int dayOfMonth) {
 //                Calendar calendar = Calendar.getInstance();
                 calendar.set(year, month, dayOfMonth);
-                dateInEpoch = calendar.getTime().getTime();
+                Log.i("Date picker", "Date = "+dayOfMonth);
+                Log.i("Date picker", "month = "+month);
+                Log.i("Date picker", "year = "+year);
+
+                try {
+                    dateInEpoch = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).parse("" +
+                            dayOfMonth +
+                            "/" +
+                            (month+1) +
+                            "/" +
+                            year +
+                            " 00:00:00").getTime();
+                    Log.i("DatePicker", "New date =" +dateInEpoch);
+                } catch (ParseException e) {
+                    e.printStackTrace();
+                    dateInEpoch = calendar.getTime().getTime();
+                    Log.i("DatePicker", "Error so using old date =" +dateInEpoch);
+                }
+
+//                dateInEpoch = calendar.getTime().getTime();
+                Log.i("Date picker", "seconds = "+dateInEpoch);
+//                TimeZone.getDefault().getDisplayName();
                 dateEditText.setText(convert(dateInEpoch));
 
                 calendarCancelImageView.setVisibility(View.VISIBLE);
@@ -328,5 +386,18 @@ public class AddTodoActivity extends AppCompatActivity {
             onBackPressed();
         }
         return  true;
+    }
+
+
+    public int getPendingIntentId(){
+        SharedPreferences sharedPreferences = getSharedPreferences(PENDING_INTENT_ID_PREF, MODE_PRIVATE);
+        return sharedPreferences.getInt(PENDING_INTENT_ID, 1);
+
+    }
+
+    public void setPendingIntentId(int id){
+        SharedPreferences.Editor editor = getSharedPreferences(PENDING_INTENT_ID_PREF, MODE_PRIVATE).edit();
+        editor.putInt(PENDING_INTENT_ID, id);
+        editor.apply();
     }
 }

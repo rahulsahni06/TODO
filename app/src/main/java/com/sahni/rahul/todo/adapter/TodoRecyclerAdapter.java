@@ -10,13 +10,15 @@ import android.widget.CheckBox;
 import android.widget.TextView;
 
 import com.sahni.rahul.todo.R;
-import com.sahni.rahul.todo.database.TodoOpenHelper;
 import com.sahni.rahul.todo.helpers.EpochToDateTime;
 import com.sahni.rahul.todo.interfaces.CheckBoxClickedListener;
 import com.sahni.rahul.todo.interfaces.TodoViewHolderClickListener;
 import com.sahni.rahul.todo.models.TodoClass;
 
 import java.util.ArrayList;
+
+import static com.sahni.rahul.todo.database.DatabaseConstants.TIME_NOT_SET;
+import static com.sahni.rahul.todo.database.DatabaseConstants.TODO_DONE;
 
 /**
  * Created by sahni on 09-Jul-17.
@@ -61,7 +63,7 @@ public class TodoRecyclerAdapter extends RecyclerView.Adapter<TodoRecyclerAdapte
 
 
         int status = todo.getStatus();
-        if(status == TodoOpenHelper.DONE){
+        if(status == TODO_DONE){
             holder.statusCheckBox.setChecked(true);
         }
         else{
@@ -103,12 +105,12 @@ public class TodoRecyclerAdapter extends RecyclerView.Adapter<TodoRecyclerAdapte
 
     private void changeDateTimeColor(long date, long time, TodoViewHolder holder){
 
-        if(EpochToDateTime.convert(date).equalsIgnoreCase("Today") &&  (time > System.currentTimeMillis() || time == EpochToDateTime.NO_TIME_SELECTED)){
+        if(EpochToDateTime.convert(date).equalsIgnoreCase("Today") &&  (time > System.currentTimeMillis() || time == TIME_NOT_SET)){
             holder.dateTextView.setTextColor(ContextCompat.getColor(context, R.color.todoColorPrimary));
             holder.timeTextView.setTextColor(ContextCompat.getColor(context, R.color.todoColorPrimary));
         }
-        else if((time != EpochToDateTime.NO_TIME_SELECTED && time < System.currentTimeMillis())
-                || (time == EpochToDateTime.NO_TIME_SELECTED && date < System.currentTimeMillis())){
+        else if((time != TIME_NOT_SET && time < System.currentTimeMillis())
+                || (time == TIME_NOT_SET && date < System.currentTimeMillis())){
             holder.dateTextView.setTextColor(ContextCompat.getColor(context, android.R.color.holo_red_light));
             holder.timeTextView.setTextColor(ContextCompat.getColor(context, android.R.color.holo_red_light));
         }

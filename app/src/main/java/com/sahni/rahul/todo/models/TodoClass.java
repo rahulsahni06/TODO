@@ -12,19 +12,20 @@ public class TodoClass {
     private long time;
     private String category;
     private int status;
+    private int pendingIntentId;
+    private int alarmStatus;
 
-
-
-
-
-    public TodoClass(int id, String title, long date, long time, String category, int status){
+    public TodoClass(int id, String title, long date, long time, String category, int status, int pendingIntentId, int alarmStatus) {
+        this.id = id;
         this.title = title;
         this.date = date;
-        this.id = id;
         this.time = time;
         this.category = category;
         this.status = status;
+        this.pendingIntentId = pendingIntentId;
+        this.alarmStatus = alarmStatus;
     }
+
 
     public String getTitle() {
         return title;
@@ -54,4 +55,11 @@ public class TodoClass {
         return status;
     }
 
+    public int getPendingIntentId() {
+        return pendingIntentId;
+    }
+
+    public int getAlarmStatus() {
+        return alarmStatus;
+    }
 }
