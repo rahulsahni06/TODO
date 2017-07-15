@@ -1,5 +1,9 @@
 package com.sahni.rahul.todo.helpers;
 
+import android.util.Log;
+
+import com.sahni.rahul.todo.database.DatabaseConstants;
+
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -32,13 +36,13 @@ public class EpochToDateTime {
 //        return format.format(date);
 //    }
 
-    public static long NO_DATE_SELECTED = -1;
-    public static long NO_TIME_SELECTED = -1;
+//    public static long NO_DATE_SELECTED = -1;
+//    public static long NO_TIME_SELECTED = -1;
 
     public static String convert(long epochSeconds){
 
 
-        if(epochSeconds == NO_DATE_SELECTED){
+        if(epochSeconds == DatabaseConstants.DATE_NOT_SET){
             return "";
         }
 
@@ -78,12 +82,24 @@ public class EpochToDateTime {
     }
 
     public static String convertTime(long epochSeconds){
-        if(epochSeconds == NO_TIME_SELECTED){
+        if(epochSeconds == DatabaseConstants.TIME_NOT_SET){
             return "";
         }
         Date date = new Date(epochSeconds);
         SimpleDateFormat formatter = new SimpleDateFormat("hh:mm a", Locale.getDefault());
+
         return formatter.format(date);
 
+    }
+
+    public static boolean checkTodayDate(long epochSeconds){
+        SimpleDateFormat formatter = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
+        Date date = new Date(epochSeconds);
+        Date todayDate = new Date(System.currentTimeMillis());
+        String dateString = formatter.format(date);
+        String todayDateString = formatter.format(todayDate);
+        Log.i("CheckToday"," date = "+dateString);
+        Log.i("CheckToday"," current date = "+todayDateString);
+        return todayDateString.equals(dateString);
     }
 }

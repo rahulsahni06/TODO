@@ -1,8 +1,14 @@
 package com.sahni.rahul.todo.activity;
 
+import android.app.AlarmManager;
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.DatabaseUtils;
 import android.database.sqlite.SQLiteDatabase;
@@ -12,6 +18,7 @@ import android.support.design.widget.Snackbar;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.DividerItemDecoration;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -28,13 +35,22 @@ import android.widget.TextView;
 
 import com.sahni.rahul.todo.R;
 import com.sahni.rahul.todo.adapter.TodoRecyclerAdapter;
+import com.sahni.rahul.todo.broadcastReceivers.ShowNotificationReceiver;
 import com.sahni.rahul.todo.database.TodoOpenHelper;
+import com.sahni.rahul.todo.helpers.EpochToDateTime;
 import com.sahni.rahul.todo.helpers.IntentConstants;
 import com.sahni.rahul.todo.interfaces.CheckBoxClickedListener;
 import com.sahni.rahul.todo.interfaces.TodoViewHolderClickListener;
 import com.sahni.rahul.todo.models.TodoClass;
 
 import java.util.ArrayList;
+
+import static com.sahni.rahul.todo.database.DatabaseConstants.ALARM_NOT_SET;
+import static com.sahni.rahul.todo.database.DatabaseConstants.ALARM_OVER;
+import static com.sahni.rahul.todo.database.DatabaseConstants.DATE_NOT_SET;
+import static com.sahni.rahul.todo.database.DatabaseConstants.TODO_DONE;
+import static com.sahni.rahul.todo.database.DatabaseConstants.TODO_NOT_DONE;
+import static com.sahni.rahul.todo.helpers.SharedPrefConstants.PENDING_INTENT_ID_PREF;
 
 public class MainActivity extends AppCompatActivity implements TodoViewHolderClickListener, CheckBoxClickedListener {
 
@@ -44,7 +60,6 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
 
     ArrayList<TodoClass> todoArrayList;
     TextView noTodoTextView;
-    View bottomSheetView;
 
     RecyclerView todoRecyclerView;
     TodoRecyclerAdapter todoAdapter;
@@ -73,7 +88,6 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
 
         todoArrayList = new ArrayList<>();
 
-
         spinner = (Spinner) findViewById(R.id.main_spinner);
         noTodoTextView = (TextView) findViewById(R.id.no_todo_text_view);
         todoRecyclerView = (RecyclerView) findViewById(R.id.activity_main_recycler_view);
@@ -85,13 +99,15 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
 
         DividerItemDecoration itemDecoration = new DividerItemDecoration(this, DividerItemDecoration.VERTICAL);
         todoRecyclerView.addItemDecoration(itemDecoration);
+        todoRecyclerView.setItemAnimator(new DefaultItemAnimator());
         todoRecyclerView.setAdapter(todoAdapter);
 
 
 
         spinnerList = new ArrayList<>();
         spinnerList.add("All");
-        spinnerList.add("General");
+        spinnerList.add("Today");
+        spinnerList.add("Overdue");
         spinnerList.add("Personal");
         spinnerList.add("Home");
         spinnerList.add("Work");
@@ -103,7 +119,6 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
         spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-//                Toast.makeText(MainActivity.this, spinnerList.get(position) + "selected", Toast.LENGTH_SHORT).show();
                 showSpinnerSelectedCategory(position);
             }
 
@@ -142,7 +157,9 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
             long time = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_TIME));
             long date = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_DATE));
             int status = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_STATUS));
-            todoArrayList.add(new TodoClass(id, task, date, time, category, status));
+            int pendingIntentId = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_PENDING_INTENT_ID));
+            int alarmStatus = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_ALARM_STATUS));
+            todoArrayList.add(new TodoClass(id, task, date, time, category, status, pendingIntentId, alarmStatus));
         }
         return isQueryEmpty;
 
@@ -151,7 +168,7 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
 
     private void showSpinnerSelectedCategory(int position) {
 
-        boolean isQueryEmpty;
+        boolean isQueryEmpty = true;
         SQLiteDatabase database = TodoOpenHelper.getOpenHelperInstance(this).getReadableDatabase();
 
 
@@ -160,13 +177,73 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
             return;
         } else if (spinnerList.get(position).equalsIgnoreCase("Finished")) {
             todoArrayList.clear();
-            Cursor cursor = database.query(TodoOpenHelper.TODO_TABLE, null, TodoOpenHelper.TODO_STATUS + " = " + TodoOpenHelper.DONE, null, null, null, null);
+            Cursor cursor = database.query(TodoOpenHelper.TODO_TABLE, null, TodoOpenHelper.TODO_STATUS + " = " + TODO_DONE, null, null, null, null);
             isQueryEmpty = readDataAfterQuery(cursor);
             cursor.close();
-        } else {
+        }
+        else if(spinnerList.get(position).equalsIgnoreCase("Overdue")){
+            todoArrayList.clear();
+            long currentTime = System.currentTimeMillis();
+            Log.i("Spinner", "time = "+currentTime);
+
+            String args[] = {""+currentTime, ""+DATE_NOT_SET, ""+TODO_NOT_DONE, ""+ALARM_OVER, ""+ALARM_NOT_SET};
+
+            Cursor cursor = database.query(TodoOpenHelper.TODO_TABLE, null,
+                    TodoOpenHelper.TODO_DATE + " < ? AND "
+                    +TodoOpenHelper.TODO_DATE+ " != ? AND "
+                    +TodoOpenHelper.TODO_STATUS+ " = ? AND ( "
+                    +TodoOpenHelper.TODO_ALARM_STATUS+ " = ? OR "
+                    +TodoOpenHelper.TODO_ALARM_STATUS+ " = ? )",
+                    args, null, null, null);
+            while(cursor.moveToNext()){
+                long epochSeconds = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_DATE));
+                int alarmStatus = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_ALARM_STATUS));
+                if(!EpochToDateTime.checkTodayDate(epochSeconds ) || (EpochToDateTime.checkTodayDate(epochSeconds ) && alarmStatus == ALARM_OVER ) ){
+                    isQueryEmpty = false;
+                    int id = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_ID));
+                    String task = cursor.getString(cursor.getColumnIndex(TodoOpenHelper.TODO_TASK));
+                    String category = cursor.getString(cursor.getColumnIndex(TodoOpenHelper.TODO_CATEGORY));
+                    long date = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_DATE));
+                    long time = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_TIME));
+                    int status = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_STATUS));
+                    int pendingIntentId = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_PENDING_INTENT_ID));
+                    todoArrayList.add(new TodoClass(id, task, date, time, category, status, pendingIntentId, alarmStatus));
+
+                }
+            }
+            cursor.close();
+        }
+        else if(spinnerList.get(position).equalsIgnoreCase("Today")){
+            todoArrayList.clear();
+            long currentTime = System.currentTimeMillis();
+            Log.i("Spinner", "time = "+currentTime);
+            String args[] = {""+DATE_NOT_SET, ""+TODO_NOT_DONE};
+            Cursor cursor = database.query(TodoOpenHelper.TODO_TABLE, null,TodoOpenHelper.TODO_DATE+ " != ? AND "+TodoOpenHelper.TODO_STATUS+ " = ?", args, null, null, null);
+            while(cursor.moveToNext()){
+                long epochSeconds = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_DATE));
+                if(EpochToDateTime.checkTodayDate(epochSeconds)){
+                    isQueryEmpty = false;
+                    int id = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_ID));
+                    String task = cursor.getString(cursor.getColumnIndex(TodoOpenHelper.TODO_TASK));
+                    String category = cursor.getString(cursor.getColumnIndex(TodoOpenHelper.TODO_CATEGORY));
+                    long date = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_DATE));
+                    long time = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_TIME));
+                    int status = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_STATUS));
+                    int pendingIntentId = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_PENDING_INTENT_ID));
+                    int alarmStatus = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_ALARM_STATUS));
+                    todoArrayList.add(new TodoClass(id, task, date, time, category, status, pendingIntentId, alarmStatus));
+
+                }
+            }
+            todoAdapter.notifyDataSetChanged();
+//            isQueryEmpty = readDataAfterQuery(cursor);
+            cursor.close();
+        }
+
+        else {
             todoArrayList.clear();
 
-            String argument[] = {spinnerList.get(position), "" + TodoOpenHelper.NOT_DONE};
+            String argument[] = {spinnerList.get(position), "" + TODO_NOT_DONE};
             Cursor cursor = database.query(TodoOpenHelper.TODO_TABLE, null, TodoOpenHelper.TODO_CATEGORY + " = ? AND " + TodoOpenHelper.TODO_STATUS + " = ?",
                     argument, null, null, null);
             isQueryEmpty = readDataAfterQuery(cursor);
@@ -237,6 +314,8 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
 
     private void showDeleteCategoryAlert(final String category, final SQLiteDatabase database){
 
+        final String column[] = {TodoOpenHelper.TODO_PENDING_INTENT_ID};
+
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Delete");
         builder.setMessage("Are you sure you want to delete "+"\""+category+"\" list?");
@@ -246,15 +325,36 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
 
                 if(category.equalsIgnoreCase("Finished")){
 
-                    database.delete(TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS+" = "+ TodoOpenHelper.DONE,null);
+
+                    Cursor cursor = database.query(TodoOpenHelper.TODO_TABLE, column,TodoOpenHelper.TODO_PENDING_INTENT_ID+ " != 0 AND "+ TodoOpenHelper.TODO_STATUS+" = "+TODO_DONE, null, null, null, null);
+                    while(cursor.moveToNext()){
+                        int pendingInt = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_PENDING_INTENT_ID));
+                        cancelNotification(pendingInt);
+                    }
+                    cursor.close();
+                    database.delete(TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS+" = "+ TODO_DONE,null);
 
                 }
                 else if(category.equalsIgnoreCase("All")){
-                    database.delete(TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS+" = "+ TodoOpenHelper.NOT_DONE,null);
+                    Cursor cursor = database.query(TodoOpenHelper.TODO_TABLE, column,TodoOpenHelper.TODO_PENDING_INTENT_ID+ " != 0", null, null, null, null);
+                    while(cursor.moveToNext()){
+                        int pendingInt = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_PENDING_INTENT_ID));
+                        cancelNotification(pendingInt);
+                    }
+                    cursor.close();
+                    database.delete(TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS+" = "+ TODO_NOT_DONE,null);
+                    deleteStoredPendingIntentId();
+
                 }
                 else{
 
-                    String arguments[] = {""+TodoOpenHelper.NOT_DONE, category };
+                    String arguments[] = {""+TODO_NOT_DONE, category };
+                    Cursor cursor = database.query(TodoOpenHelper.TODO_TABLE, null,TodoOpenHelper.TODO_PENDING_INTENT_ID+ " != 0 AND "+ TodoOpenHelper.TODO_CATEGORY+" = '"+category+"'", null, null, null, null);
+                    while(cursor.moveToNext()){
+                        int pendingInt = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_PENDING_INTENT_ID));
+                        cancelNotification(pendingInt);
+                    }
+                    cursor.close();
 
                     database.delete(TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS+" = ? AND "+ TodoOpenHelper.TODO_CATEGORY + " = ?",arguments);
 
@@ -322,7 +422,7 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
             todoRecyclerView.setVisibility(View.VISIBLE);
             addNewTodo();
             spinner.setSelection(((ArrayAdapter) spinner.getAdapter()).getPosition("All"));
-            todoRecyclerView.scrollToPosition(todoAdapter.getItemCount());
+            todoRecyclerView.smoothScrollToPosition(todoArrayList.size());
 
         } else if (requestCode == EDIT_REQ_CODE && resultCode == RESULT_OK) {
 
@@ -365,7 +465,9 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
         long date = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_DATE));
         long time = cursor.getLong(cursor.getColumnIndex(TodoOpenHelper.TODO_TIME));
         String category = cursor.getString(cursor.getColumnIndex(TodoOpenHelper.TODO_CATEGORY));
-        todoArrayList.add(new TodoClass(id, task, date, time, category, TodoOpenHelper.NOT_DONE));
+        int pendingIntentId = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_PENDING_INTENT_ID));
+        int alarmStatus = cursor.getInt(cursor.getColumnIndex(TodoOpenHelper.TODO_ALARM_STATUS));
+        todoArrayList.add(new TodoClass(id, task, date, time, category, TODO_NOT_DONE, pendingIntentId, alarmStatus));
         todoAdapter.notifyDataSetChanged();
         cursor.close();
 
@@ -376,17 +478,17 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
     private long getNoOfTodoNotDone(SQLiteDatabase database) {
 
 
-        return DatabaseUtils.queryNumEntries(database, TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS + " = "+TodoOpenHelper.NOT_DONE);
+        return DatabaseUtils.queryNumEntries(database, TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS + " = "+TODO_NOT_DONE);
 
     }
 
     private long getNoOfTodoDone(SQLiteDatabase database){
-        return DatabaseUtils.queryNumEntries(database, TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS + " = "+TodoOpenHelper.DONE);
+        return DatabaseUtils.queryNumEntries(database, TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS + " = "+TODO_DONE);
     }
 
     private long getNoOfTodoInCategory(SQLiteDatabase database, String category){
 
-        String arguments[] = {""+TodoOpenHelper.NOT_DONE, category };
+        String arguments[] = {""+TODO_NOT_DONE, category };
         return DatabaseUtils.queryNumEntries(database, TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS+" = ? AND "+ TodoOpenHelper.TODO_CATEGORY + " = ?",arguments);
 
     }
@@ -395,8 +497,9 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
     @Override
     public void checkBoxClicked(final CheckBox checkBox, int position) {
 
-        TodoClass todo = todoArrayList.get(position);
+        final TodoClass todo = todoArrayList.get(position);
         final int id = todo.getId();
+        final int pendingId = todo.getPendingIntentId();
 
         Log.i("listAdapter", "checked fun =" + checkBox.isChecked());
 
@@ -411,16 +514,9 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
                 public void onClick(DialogInterface dialog, int which) {
                     SQLiteDatabase database = TodoOpenHelper.getOpenHelperInstance(MainActivity.this).getWritableDatabase();
                     ContentValues cv = new ContentValues();
-                    cv.put(TodoOpenHelper.TODO_STATUS, TodoOpenHelper.DONE);
+                    cv.put(TodoOpenHelper.TODO_STATUS, TODO_DONE);
                     database.update(TodoOpenHelper.TODO_TABLE, cv, TodoOpenHelper.TODO_ID + " = " + id, null);
-//                fetchAllTodo();
-//                spinner.setSelection(((ArrayAdapter)spinner.getAdapter()).getPosition("All"));
-//                    if(spinner.getSelectedItemPosition() == 0){
-//                        fetchAllTodo();
-//                    }
-//                    else{
-//                        spinner.setSelection(((ArrayAdapter)spinner.getAdapter()).getPosition("All"));
-//                    }
+                    cancelNotification(pendingId);
                     showSpinnerSelectedCategory(spinner.getSelectedItemPosition());
 
                 }
@@ -444,18 +540,19 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
             builder.setPositiveButton("Yes", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
+                    String title = todo.getTitle();
+                    long timeInEpoch = todo.getTime();
+
                     SQLiteDatabase database = TodoOpenHelper.getOpenHelperInstance(MainActivity.this).getWritableDatabase();
                     ContentValues cv = new ContentValues();
-                    cv.put(TodoOpenHelper.TODO_STATUS, TodoOpenHelper.NOT_DONE);
+                    cv.put(TodoOpenHelper.TODO_STATUS, TODO_NOT_DONE);
+                    AlarmManager alarmManager = (AlarmManager) MainActivity.this.getSystemService(Context.ALARM_SERVICE);
+                    Intent intent = new Intent(MainActivity.this, ShowNotificationReceiver.class);
+                    intent.putExtra(IntentConstants.TODO_TITLE, title);
+                    intent.putExtra(IntentConstants.TODO_PENDING_ID, pendingId);
+                    PendingIntent pendingIntent = PendingIntent.getBroadcast(MainActivity.this, pendingId, intent, 0);
+                    alarmManager.set(AlarmManager.RTC, timeInEpoch, pendingIntent);
                     database.update(TodoOpenHelper.TODO_TABLE, cv, TodoOpenHelper.TODO_ID + " = " + id, null);
-//                fetchAllTodo();
-//                spinner.setSelection(((ArrayAdapter)spinner.getAdapter()).getPosition("All"));
-//                    if(spinner.getSelectedItemPosition() == 0){
-//                        fetchAllTodo();
-//                    }
-//                    else{
-//                        spinner.setSelection(((ArrayAdapter)spinner.getAdapter()).getPosition("All"));
-//                    }
                     showSpinnerSelectedCategory(spinner.getSelectedItemPosition());
 
                 }
@@ -505,8 +602,10 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
             public void onClick(DialogInterface dialog, int which) {
                 TodoClass todo = todoArrayList.get(position);
                 int todoId = todo.getId();
+                int pendingIntentId = todo.getPendingIntentId();
                 deleteRowFromList(todoId);
                 showSpinnerSelectedCategory(spinner.getSelectedItemPosition());
+                cancelNotification(pendingIntentId);
 
             }
         });
@@ -523,10 +622,49 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
 
     }
 
+    private void cancelNotification(int pendingIntentId) {
+
+        AlarmManager alarmManager = (AlarmManager) this.getSystemService(Context.ALARM_SERVICE);
+        Intent intent = new Intent(this, ShowNotificationReceiver.class);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, pendingIntentId, intent, 0);
+        alarmManager.cancel(pendingIntent);
+    }
 
 
 
 
+
+    private void deleteStoredPendingIntentId(){
+        SharedPreferences.Editor editor = getSharedPreferences(PENDING_INTENT_ID_PREF, MODE_PRIVATE).edit();
+        editor.clear();
+        editor.apply();
+
+    }
+
+    private BroadcastReceiver notificationActionReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            showSpinnerSelectedCategory(spinner.getSelectedItemPosition());
+            Snackbar.make(todoRecyclerView,"Todo marked as finished", Snackbar.LENGTH_SHORT).show();
+
+        }
+    };
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(IntentConstants.MARK_TODO_AS_DONE_ACTION);
+        registerReceiver(this.notificationActionReceiver, intentFilter);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        unregisterReceiver(this.notificationActionReceiver);
+    }
 }
 
 

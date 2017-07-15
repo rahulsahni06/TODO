@@ -10,16 +10,24 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 public class TodoOpenHelper extends SQLiteOpenHelper {
 
-    public static String TODO_ID = "id";
-    public static String TODO_TABLE = "todo";
-    public static String TODO_TASK = "task";
-    public static String TODO_CATEGORY = "category";
-    public static String TODO_DATE = "date";
-    public static String TODO_TIME = "time";
-    public static String TODO_STATUS = "status";
+    public static final String TODO_ID = "id";
+    public static final String TODO_TABLE = "myTodo";
+    public static final String TODO_TASK = "task";
+    public static final String TODO_CATEGORY = "category";
+    public static final String TODO_DATE = "date";
+    public static final String TODO_TIME = "time";
+    public static final String TODO_STATUS = "status";
+    public static final String TODO_PENDING_INTENT_ID = "intent_id";
+    public static final String TODO_ALARM_STATUS ="alarm_status";
 
-    public static int NOT_DONE = 0;
-    public static int DONE = 1;
+
+//    public static int TODO_NOT_DONE = 0;
+//    public static int TODO_DONE = 1;
+//    public static int ALARM_NOT_SET = 0;
+//    public static int ALARM_SET = 1;
+//    public static int ALARM_OVER = 2;
+//    public static int TIME_NOT_SET = 0;
+//    public static int DATE_NOT_SET = 0;
 
 
 
@@ -53,7 +61,9 @@ public class TodoOpenHelper extends SQLiteOpenHelper {
                       TODO_CATEGORY + " TEXT, "+
                       TODO_DATE + " INTEGER, "+
                       TODO_TIME + " INTEGER, "+
-                      TODO_STATUS + " INTEGER DEFAULT 0" +
+                      TODO_STATUS + " INTEGER DEFAULT 0, " +
+                      TODO_PENDING_INTENT_ID + " INTEGER DEFAULT 0, " +
+                      TODO_ALARM_STATUS + " INTEGER DEFAULT 0 "+
                 ");";
 
         db.execSQL(query);
