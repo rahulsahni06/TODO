@@ -6,13 +6,16 @@ import android.app.PendingIntent;
 import android.app.TimePickerDialog;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.support.v7.app.ActionBar;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
@@ -29,6 +32,7 @@ import android.widget.TimePicker;
 
 import com.sahni.rahul.todo.R;
 import com.sahni.rahul.todo.broadcastReceivers.ShowNotificationReceiver;
+import com.sahni.rahul.todo.database.DatabaseConstants;
 import com.sahni.rahul.todo.database.TodoOpenHelper;
 import com.sahni.rahul.todo.helpers.IntentConstants;
 
@@ -73,6 +77,10 @@ public class AddTodoActivity extends AppCompatActivity {
     long dateInEpoch = DATE_NOT_SET , timeInEpoch= TIME_NOT_SET;
     String category;
 
+    boolean isNewCategoryAdded = false;
+    ArrayList<String> spinnerList;
+    ArrayAdapter spinnerArrayAdapter;
+
     @Override
     public void onBackPressed() {
         Log.i("back button", "back pressed");
@@ -107,17 +115,17 @@ public class AddTodoActivity extends AppCompatActivity {
         timeLayout = (LinearLayout) findViewById(R.id.time_linear_layout);
 
         statusCheckBox = (CheckBox) findViewById(R.id.task_finished_checkbox);
-
-        final ArrayList<String> spinnerList = new ArrayList<>();
-        spinnerList.add("General");
-        spinnerList.add("Personal");
-        spinnerList.add("Home");
-        spinnerList.add("Work");
-
+        ImageView newCategoryImageView = (ImageView) findViewById(R.id.new_category_image_view);
         categorySpinner = (Spinner) findViewById(R.id.add_todo_spinner);
-        ArrayAdapter spinnerArrayAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, spinnerList);
+
+        spinnerList = new ArrayList<>();
+        spinnerArrayAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, spinnerList);
         spinnerArrayAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         categorySpinner.setAdapter(spinnerArrayAdapter);
+        updateSpinnerArrayList();
+
+
+
         categorySpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
@@ -127,6 +135,56 @@ public class AddTodoActivity extends AppCompatActivity {
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
+
+            }
+        });
+
+
+        newCategoryImageView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                LayoutInflater inflater = getLayoutInflater();
+                final View dialogView = inflater.inflate(R.layout.add_new_category_dialog_layout, null);
+                AlertDialog.Builder builder = new AlertDialog.Builder(AddTodoActivity.this)
+                        .setView(dialogView)
+                        .setPositiveButton("Add", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+
+
+                            }
+                        })
+                        .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                isNewCategoryAdded = false;
+                                dialog.dismiss();
+                            }
+                        });
+                final AlertDialog dialog = builder.create();
+                dialog.show();
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        EditText editText = (EditText) dialogView.findViewById(R.id.add_category_edit_text);
+                        String newCategory = editText.getText().toString();
+                        if(newCategory.trim().equals("")){
+                            editText.setError("Please enter valid category");
+                        }
+                        else{
+                            spinnerList.add(newCategory);
+                            spinnerArrayAdapter.notifyDataSetChanged();
+                            categorySpinner.setSelection(spinnerList.size());
+                            category = newCategory;
+                            isNewCategoryAdded = true;
+                            dialog.dismiss();
+                        }
+                    }
+                });
+
+
+
+
 
             }
         });
@@ -226,6 +284,9 @@ public class AddTodoActivity extends AppCompatActivity {
                 cv.put(TodoOpenHelper.TODO_DATE, dateInEpoch);
                 cv.put(TodoOpenHelper.TODO_TIME, timeInEpoch);
 
+                Intent sendResultIntent = new Intent();
+                sendResultIntent.putExtra(IntentConstants.NEW_CATEGORY, isNewCategoryAdded);
+
 
                 if(reqCode == MainActivity.ADD_REQ_CODE){
 
@@ -249,7 +310,7 @@ public class AddTodoActivity extends AppCompatActivity {
 
                         }
                         database.insert(TodoOpenHelper.TODO_TABLE, null, cv);
-                        setResult(RESULT_OK);
+                        setResult(RESULT_OK, sendResultIntent);
                         finish();
                     }
 
@@ -281,7 +342,7 @@ public class AddTodoActivity extends AppCompatActivity {
                         cv.put(TodoOpenHelper.TODO_ALARM_STATUS, ALARM_NOT_SET);
                     }
                     database.update(TodoOpenHelper.TODO_TABLE, cv, TodoOpenHelper.TODO_ID + " = "+id, null);
-                    setResult(RESULT_OK);
+                    setResult(RESULT_OK, sendResultIntent);
                     finish();
                 }
 
@@ -399,5 +460,15 @@ public class AddTodoActivity extends AppCompatActivity {
         SharedPreferences.Editor editor = getSharedPreferences(PENDING_INTENT_ID_PREF, MODE_PRIVATE).edit();
         editor.putInt(PENDING_INTENT_ID, id);
         editor.apply();
+    }
+
+    public void updateSpinnerArrayList(){
+        spinnerList.addAll(DatabaseConstants.getSpinnerArrayList(this));
+        spinnerList.remove("All");
+        spinnerList.remove("Today");
+        spinnerList.remove("Finished");
+        spinnerList.remove("Overdue");
+        spinnerArrayAdapter.notifyDataSetChanged();
+
     }
 }

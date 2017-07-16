@@ -26,6 +26,7 @@ import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.SubMenu;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -36,6 +37,7 @@ import android.widget.TextView;
 import com.sahni.rahul.todo.R;
 import com.sahni.rahul.todo.adapter.TodoRecyclerAdapter;
 import com.sahni.rahul.todo.broadcastReceivers.ShowNotificationReceiver;
+import com.sahni.rahul.todo.database.DatabaseConstants;
 import com.sahni.rahul.todo.database.TodoOpenHelper;
 import com.sahni.rahul.todo.helpers.EpochToDateTime;
 import com.sahni.rahul.todo.helpers.IntentConstants;
@@ -67,6 +69,7 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
 
     ArrayList<String> spinnerList;
     Spinner spinner;
+    ArrayAdapter spinnerAdapter;
 
 
     @Override
@@ -105,17 +108,12 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
 
 
         spinnerList = new ArrayList<>();
-        spinnerList.add("All");
-        spinnerList.add("Today");
-        spinnerList.add("Overdue");
-        spinnerList.add("Personal");
-        spinnerList.add("Home");
-        spinnerList.add("Work");
-        spinnerList.add("Finished");
-
-        final ArrayAdapter spinnerAdapter = new ArrayAdapter<>(this, R.layout.spinner_item, spinnerList);
+        spinnerAdapter = new ArrayAdapter<>(this, R.layout.spinner_item, spinnerList);
         spinner.setAdapter(spinnerAdapter);
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        updateSpinnerArrayList();
+
+
         spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
@@ -172,7 +170,7 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
         SQLiteDatabase database = TodoOpenHelper.getOpenHelperInstance(this).getReadableDatabase();
 
 
-        if (position == 0) {
+        if (spinnerList.get(position).equalsIgnoreCase("All")) {
             fetchAllTodo();
             return;
         } else if (spinnerList.get(position).equalsIgnoreCase("Finished")) {
@@ -275,7 +273,15 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.main_menu, menu);
+//        Log.i("prepare", "create menu called");
+////        getMenuInflater().inflate(R.menu.main_menu, menu);
+//        SubMenu subMenu = menu.addSubMenu("Delete");
+//        for(String category : spinnerList){
+//            if(!category.equalsIgnoreCase("Today") && !category.equalsIgnoreCase("Overdue")){
+//                subMenu.add(category);
+//            }
+//        }
+
         return true;
     }
 
@@ -284,35 +290,19 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
 
-
-        if (id == R.id.menu_delete_all) {
-            deleteRowByCategory("All");
-
-        }else if(id == R.id.menu_delete_general){
-            deleteRowByCategory("General");
-
-        }else if(id == R.id.menu_delete_personal){
-            deleteRowByCategory("Personal");
-
-
-        }else if(id == R.id.menu_delete_home){
-            deleteRowByCategory("Home");
-
-        }else if(id == R.id.menu_delete_work){
-            deleteRowByCategory("Work");
-
-
-        }else if(id == R.id.menu_delete_finished){
-            deleteRowByCategory("Finished");
-
-
+        for(int i =0; i<spinnerList.size(); i++){
+            String category = spinnerList.get(i);
+            if(id == spinnerList.indexOf(category) && (!category.equals("Today") || (!category.equals("Overdue")))){
+                deleteRowByCategory(category);
+            }
         }
-
         return true;
     }
 
 
     private void showDeleteCategoryAlert(final String category, final SQLiteDatabase database){
+
+        final boolean isCustomColumn[] = {true};
 
         final String column[] = {TodoOpenHelper.TODO_PENDING_INTENT_ID};
 
@@ -347,6 +337,10 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
 
                 }
                 else{
+                    if(category.equals("General") || category.equals("Personal") || category.equals("Home")
+                    || category.equals("Work")){
+                        isCustomColumn[0] = false;
+                    }
 
                     String arguments[] = {""+TODO_NOT_DONE, category };
                     Cursor cursor = database.query(TodoOpenHelper.TODO_TABLE, null,TodoOpenHelper.TODO_PENDING_INTENT_ID+ " != 0 AND "+ TodoOpenHelper.TODO_CATEGORY+" = '"+category+"'", null, null, null, null);
@@ -359,9 +353,23 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
                     database.delete(TodoOpenHelper.TODO_TABLE, TodoOpenHelper.TODO_STATUS+" = ? AND "+ TodoOpenHelper.TODO_CATEGORY + " = ?",arguments);
 
                 }
+                if(isCustomColumn[0]) {
+                    int size = spinnerList.size();
+                    spinnerList.clear();
+                    updateSpinnerArrayList();
+                    spinnerAdapter.notifyDataSetChanged();
+                    invalidateOptionsMenu();
+//
+                }
+                    try{
+                        showSpinnerSelectedCategory(spinner.getSelectedItemPosition());
+                    }catch (Exception e){
+                        e.printStackTrace();
+                        spinner.setSelection(((ArrayAdapter) spinner.getAdapter()).getPosition("All"));
+                    }
 
                 Snackbar.make(todoRecyclerView, category+" List deleted", Snackbar.LENGTH_SHORT ).show();
-                showSpinnerSelectedCategory(spinner.getSelectedItemPosition());
+
 
             }
         });
@@ -415,21 +423,30 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 
-        Log.d("onActivityResult_tag", "in onActivty");
-        if (requestCode == ADD_REQ_CODE && resultCode == RESULT_OK) {
+        if(resultCode == RESULT_OK){
 
-            noTodoTextView.setVisibility(View.GONE);
-            todoRecyclerView.setVisibility(View.VISIBLE);
-            addNewTodo();
-            spinner.setSelection(((ArrayAdapter) spinner.getAdapter()).getPosition("All"));
-            todoRecyclerView.smoothScrollToPosition(todoArrayList.size());
+            boolean isNewCategoryAdded = data.getBooleanExtra(IntentConstants.NEW_CATEGORY, false);
+            if(isNewCategoryAdded){
+                updateSpinnerArrayList();
 
-        } else if (requestCode == EDIT_REQ_CODE && resultCode == RESULT_OK) {
+                invalidateOptionsMenu();
+            }
+            if (requestCode == ADD_REQ_CODE) {
 
-            fetchAllTodo();
-            spinner.setSelection(((ArrayAdapter) spinner.getAdapter()).getPosition("All"));
+                noTodoTextView.setVisibility(View.GONE);
+                todoRecyclerView.setVisibility(View.VISIBLE);
+                addNewTodo();
+                spinner.setSelection(((ArrayAdapter) spinner.getAdapter()).getPosition("All"));
+                todoRecyclerView.smoothScrollToPosition(todoArrayList.size());
 
+            } else if (requestCode == EDIT_REQ_CODE) {
+
+                fetchAllTodo();
+                spinner.setSelection(((ArrayAdapter) spinner.getAdapter()).getPosition("All"));
+
+            }
         }
+
     }
 
 
@@ -516,7 +533,10 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
                     ContentValues cv = new ContentValues();
                     cv.put(TodoOpenHelper.TODO_STATUS, TODO_DONE);
                     database.update(TodoOpenHelper.TODO_TABLE, cv, TodoOpenHelper.TODO_ID + " = " + id, null);
-                    cancelNotification(pendingId);
+                    if(pendingId != 0){
+                        cancelNotification(pendingId);
+                    }
+
                     showSpinnerSelectedCategory(spinner.getSelectedItemPosition());
 
                 }
@@ -546,12 +566,16 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
                     SQLiteDatabase database = TodoOpenHelper.getOpenHelperInstance(MainActivity.this).getWritableDatabase();
                     ContentValues cv = new ContentValues();
                     cv.put(TodoOpenHelper.TODO_STATUS, TODO_NOT_DONE);
-                    AlarmManager alarmManager = (AlarmManager) MainActivity.this.getSystemService(Context.ALARM_SERVICE);
-                    Intent intent = new Intent(MainActivity.this, ShowNotificationReceiver.class);
-                    intent.putExtra(IntentConstants.TODO_TITLE, title);
-                    intent.putExtra(IntentConstants.TODO_PENDING_ID, pendingId);
-                    PendingIntent pendingIntent = PendingIntent.getBroadcast(MainActivity.this, pendingId, intent, 0);
-                    alarmManager.set(AlarmManager.RTC, timeInEpoch, pendingIntent);
+
+                    if(pendingId != 0){
+                        AlarmManager alarmManager = (AlarmManager) MainActivity.this.getSystemService(Context.ALARM_SERVICE);
+                        Intent intent = new Intent(MainActivity.this, ShowNotificationReceiver.class);
+                        intent.putExtra(IntentConstants.TODO_TITLE, title);
+                        intent.putExtra(IntentConstants.TODO_PENDING_ID, pendingId);
+                        PendingIntent pendingIntent = PendingIntent.getBroadcast(MainActivity.this, pendingId, intent, 0);
+                        alarmManager.set(AlarmManager.RTC, timeInEpoch, pendingIntent);
+                    }
+
                     database.update(TodoOpenHelper.TODO_TABLE, cv, TodoOpenHelper.TODO_ID + " = " + id, null);
                     showSpinnerSelectedCategory(spinner.getSelectedItemPosition());
 
@@ -606,6 +630,7 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
                 deleteRowFromList(todoId);
                 showSpinnerSelectedCategory(spinner.getSelectedItemPosition());
                 cancelNotification(pendingIntentId);
+
 
             }
         });
@@ -664,6 +689,29 @@ public class MainActivity extends AppCompatActivity implements TodoViewHolderCli
         super.onPause();
 
         unregisterReceiver(this.notificationActionReceiver);
+    }
+
+    @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+
+        Log.i("prepare", "prepare menu called");
+
+        menu.clear();
+
+        SubMenu subMenu = menu.addSubMenu(0, -1, 0,"Delete");
+        for(String category : spinnerList){
+            if(!category.equalsIgnoreCase("Today") && !category.equalsIgnoreCase("Overdue")){
+                subMenu.add(0,spinnerList.indexOf(category),0,category);
+            }
+        }
+
+        return true;
+    }
+
+    void updateSpinnerArrayList(){
+        spinnerList.clear();
+        spinnerList.addAll(DatabaseConstants.getSpinnerArrayList(this));
+        spinnerAdapter.notifyDataSetChanged();
     }
 }
 
